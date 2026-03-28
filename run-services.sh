@@ -43,15 +43,22 @@ echo "🚀 Pokretanje servisa..."
 echo ""
 
 # Check if jars exist
-for service in "User Service" "Resource Service" "Booking Service" "Payment Service"; do
-    jar_path="${service}/target/${service//Service/}-service-0.0.1-SNAPSHOT.jar"
-    jar_path=$(echo "$jar_path" | sed 's/-service-service/-service/g' | sed 's/ //g')
-
-    if [ ! -f "$jar_path" ]; then
-        echo "❌ JAR ne postoji za $service"
-        exit 1
-    fi
-done
+if [ ! -f "User Service/target/user-service-0.0.1-SNAPSHOT.jar" ]; then
+    echo "❌ JAR ne postoji: User Service/target/user-service-0.0.1-SNAPSHOT.jar"
+    exit 1
+fi
+if [ ! -f "Resource Service/target/resource-service-0.0.1-SNAPSHOT.jar" ]; then
+    echo "❌ JAR ne postoji: Resource Service/target/resource-service-0.0.1-SNAPSHOT.jar"
+    exit 1
+fi
+if [ ! -f "Booking Service/target/booking-service-0.0.1-SNAPSHOT.jar" ]; then
+    echo "❌ JAR ne postoji: Booking Service/target/booking-service-0.0.1-SNAPSHOT.jar"
+    exit 1
+fi
+if [ ! -f "Payment Service/target/payment-service-0.0.1-SNAPSHOT.jar" ]; then
+    echo "❌ JAR ne postoji: Payment Service/target/payment-service-0.0.1-SNAPSHOT.jar"
+    exit 1
+fi
 
 # Start services
 echo "1️⃣  User Service (8081)..."
