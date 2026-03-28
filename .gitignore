@@ -3,6 +3,11 @@
 /target/
 **/target/
 
+# Environment variables
+.env
+.env.local
+.env.*.local
+
 # IntelliJ IDEA
 .idea/
 *.iml
@@ -34,5 +39,7 @@ hs_err_pid*
 .classpath
 .project
 .settings/
+
+
 
 

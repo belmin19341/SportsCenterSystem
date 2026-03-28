@@ -1,0 +1,97 @@
+services:
+
+  # ── User Service Database ──────────────────────────
+  mysql-user:
+    image: mysql:8.0
+    container_name: sportcenter-user-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${USER_DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${USER_DB_PORT}:3306"
+    volumes:
+      - user-db-data:/var/lib/mysql
+    networks:
+      - sportcenter-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Resource Service Database ──────────────────────
+  mysql-resource:
+    image: mysql:8.0
+    container_name: sportcenter-resource-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${RESOURCE_DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${RESOURCE_DB_PORT}:3306"
+    volumes:
+      - resource-db-data:/var/lib/mysql
+    networks:
+      - sportcenter-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Booking Service Database ───────────────────────
+  mysql-booking:
+    image: mysql:8.0
+    container_name: sportcenter-booking-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${BOOKING_DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${BOOKING_DB_PORT}:3306"
+    volumes:
+      - booking-db-data:/var/lib/mysql
+    networks:
+      - sportcenter-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Payment Service Database ───────────────────────
+  mysql-payment:
+    image: mysql:8.0
+    container_name: sportcenter-payment-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${PAYMENT_DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${PAYMENT_DB_PORT}:3306"
+    volumes:
+      - payment-db-data:/var/lib/mysql
+    networks:
+      - sportcenter-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  user-db-data:
+  resource-db-data:
+  booking-db-data:
+  payment-db-data:
+
+networks:
+  sportcenter-net:
+    driver: bridge
+
+
