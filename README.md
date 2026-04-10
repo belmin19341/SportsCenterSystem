@@ -22,6 +22,7 @@
 - **Docker & Docker Compose** — `docker --version && docker compose version`
 - Maven **nije** potreban globalno — koristimo `./mvnw` wrapper unutar svakog servisa
 - **`.env` fajl** — kopirajte `.env.example` → `.env` prije pokretanja
+- Projekt koristi **Lombok 1.18.44**, kompatibilan sa JDK 17+ i ažuriran da build radi i na novijim JDK-ovima poput 25
 
 ---
 
@@ -47,21 +48,22 @@ Sva 4 kontejnera trebaju biti `healthy` (pričekajte ~15 sekundi nakon pokretanj
 
 ### 2. Buildati servise
 
-Svaki servis se builda zasebno iz svog foldera:
+**Opcija A — Skripta (PREPORUČENO):**
 
 ```bash
-# User Service
-cd "User Service" && chmod +x mvnw && ./mvnw clean package -DskipTests && cd ..
-
-# Resource Service
-cd "Resource Service" && chmod +x mvnw && ./mvnw clean package -DskipTests && cd ..
-
-# Booking Service
-cd "Booking Service" && chmod +x mvnw && ./mvnw clean package -DskipTests && cd ..
-
-# Payment Service
-cd "Payment Service" && chmod +x mvnw && ./mvnw clean package -DskipTests && cd ..
+chmod +x build-services.sh
+./build-services.sh
 ```
+
+**Opcija B — Ručno, jednim paste-safe blokom:**
+
+```bash
+for service in "User Service" "Resource Service" "Booking Service" "Payment Service"; do
+  (cd "$service" && chmod +x mvnw && ./mvnw clean package -DskipTests) || break
+done
+```
+
+> **Napomena:** U interaktivnom `zsh` shell-u linije koje počinju sa `#` nisu komentar osim ako ručno uključite `setopt interactivecomments`, zato su komande iznad napisane bez komentara.
 
 ### 3. Pokrenuti servise
 
@@ -103,6 +105,7 @@ java -jar "User Service/target/user-service-0.0.1-SNAPSHOT.jar" &
 java -jar "Resource Service/target/resource-service-0.0.1-SNAPSHOT.jar" &
 java -jar "Booking Service/target/booking-service-0.0.1-SNAPSHOT.jar" &
 java -jar "Payment Service/target/payment-service-0.0.1-SNAPSHOT.jar" &
+```
 
 ### 4. Verifikacija
 
@@ -110,15 +113,26 @@ Nakon pokretanja, servisi automatski:
 - kreiraju tabele u bazi (Hibernate `ddl-auto=update`)
 - unesu početne podatke (DataLoader — samo pri prvom pokretanju)
 
-Provjera da servisi rade:
+Provjera da servisi rade preko health endpoint-a:
 ```bash
-curl http://localhost:8081  # User Service
-curl http://localhost:8082  # Resource Service
-curl http://localhost:8083  # Booking Service
-curl http://localhost:8084  # Payment Service
+curl http://localhost:8081/actuator/health  # User Service
+curl http://localhost:8082/actuator/health  # Resource Service
+curl http://localhost:8083/actuator/health  # Booking Service
+curl http://localhost:8084/actuator/health  # Payment Service
 ```
 
-(Očekujte `404` — još nemamo kontrolere/endpoint-e, ali servis odgovara.)
+Očekujte HTTP `200` i JSON odgovor poput:
+
+```json
+{"status":"UP"}
+```
+
+Po želji možete provjeriti i probe endpoint-e:
+
+```bash
+curl http://localhost:8081/actuator/health/liveness
+curl http://localhost:8081/actuator/health/readiness
+```
 
 ---
 
@@ -143,21 +157,22 @@ Koristite `curl` za provjeru da servisi rade:
 
 ```bash
 # User Service
-curl -i http://localhost:8081/
+curl -i http://localhost:8081/actuator/health
 
 # Resource Service
-curl -i http://localhost:8082/
+curl -i http://localhost:8082/actuator/health
 
 # Booking Service
-curl -i http://localhost:8083/
+curl -i http://localhost:8083/actuator/health
 
 # Payment Service
-curl -i http://localhost:8084/
+curl -i http://localhost:8084/actuator/health
 ```
 
 **Očekivani odgovori:**
-- HTTP Status: `404` (jer nemamo root endpoint-e)
-- **Važno:** Servis **mora** odgovoriti — samo što vraća 404. Ako dobijete `Connection refused`, servis nije pokrenut.
+- HTTP Status: `200`
+- JSON payload sa `"status":"UP"`
+- Ako dobijete `Connection refused`, servis nije pokrenut.
 
 ### 3. **Pregled logova servisa**
 
@@ -167,6 +182,7 @@ Ako ste pokrenuli preko skripte (`./run-services.sh`):
 # Pratiti logove u realnom vremenu
 tail -f /tmp/user-service.log
 tail -f /tmp/resource-service.log
+tail -f /tmp/booking-service.log
 tail -f /tmp/payment-service.log
 
 # Ili svi odjednom (u drug terminalu)

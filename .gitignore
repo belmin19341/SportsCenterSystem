@@ -4,7 +4,7 @@
 **/target/
 
 # Environment variables
-.env
+.env*
 .env.local
 .env.*.local
 
@@ -40,6 +40,4 @@ hs_err_pid*
 .project
 .settings/
 
-
-
-
+*.local
