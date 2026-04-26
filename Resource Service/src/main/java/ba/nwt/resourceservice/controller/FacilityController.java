@@ -23,9 +23,24 @@ public class FacilityController {
     private final FacilityService facilityService;
 
     @GetMapping
-    @Operation(summary = "Get all facilities")
-    public ResponseEntity<List<FacilityResponseDTO>> getAll() {
+    @Operation(summary = "Get all facilities (paginated, sortable, filterable)")
+    public ResponseEntity<?> list(
+            @RequestParam(required = false) Facility.FacilityType type,
+            @RequestParam(required = false) Facility.FacilityStatus status,
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "false") boolean paged,
+            @org.springframework.data.web.PageableDefault(size = 20, sort = "id") org.springframework.data.domain.Pageable pageable) {
+        if (paged || type != null || status != null || q != null) {
+            return ResponseEntity.ok(facilityService.search(type, status, q, pageable));
+        }
         return ResponseEntity.ok(facilityService.getAll());
+    }
+
+    @org.springframework.web.bind.annotation.PatchMapping(value = "/{id}", consumes = "application/json-patch+json")
+    @Operation(summary = "Partially update a facility (RFC 6902 JSON Patch)")
+    public ResponseEntity<FacilityResponseDTO> patch(@PathVariable Long id,
+                                                     @RequestBody com.github.fge.jsonpatch.JsonPatch patch) {
+        return ResponseEntity.ok(facilityService.patch(id, patch));
     }
 
     @GetMapping("/{id}")

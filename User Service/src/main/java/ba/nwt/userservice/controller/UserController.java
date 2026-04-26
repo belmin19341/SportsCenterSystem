@@ -2,12 +2,18 @@ package ba.nwt.userservice.controller;
 
 import ba.nwt.userservice.dto.UserRequestDTO;
 import ba.nwt.userservice.dto.UserResponseDTO;
+import ba.nwt.userservice.model.User;
 import ba.nwt.userservice.service.UserService;
+import com.github.fge.jsonpatch.JsonPatch;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,9 +28,18 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping
-    @Operation(summary = "Get all users")
+    @Operation(summary = "Get all users (no pagination)")
     public ResponseEntity<List<UserResponseDTO>> getAllUsers() {
         return ResponseEntity.ok(userService.getAllUsers());
+    }
+
+    @GetMapping("/search")
+    @Operation(summary = "Search users by role and keyword (paginated + sortable)")
+    public ResponseEntity<Page<UserResponseDTO>> searchUsers(
+            @RequestParam(required = false) User.Role role,
+            @RequestParam(required = false) String q,
+            @PageableDefault(size = 20, sort = "id") Pageable pageable) {
+        return ResponseEntity.ok(userService.searchUsers(role, q, pageable));
     }
 
     @GetMapping("/{id}")
@@ -46,9 +61,15 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Update an existing user")
+    @Operation(summary = "Update an existing user (full)")
     public ResponseEntity<UserResponseDTO> updateUser(@PathVariable Long id, @Valid @RequestBody UserRequestDTO dto) {
         return ResponseEntity.ok(userService.updateUser(id, dto));
+    }
+
+    @PatchMapping(path = "/{id}", consumes = "application/json-patch+json")
+    @Operation(summary = "Partially update a user via RFC 6902 JSON Patch")
+    public ResponseEntity<UserResponseDTO> patchUser(@PathVariable Long id, @RequestBody JsonPatch patch) {
+        return ResponseEntity.ok(userService.patchUser(id, patch));
     }
 
     @DeleteMapping("/{id}")
