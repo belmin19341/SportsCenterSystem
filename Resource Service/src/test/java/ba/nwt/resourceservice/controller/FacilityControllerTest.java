@@ -43,6 +43,7 @@ class FacilityControllerTest {
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(facilityController)
                 .setControllerAdvice(new GlobalExceptionHandler())
+                .setCustomArgumentResolvers(new org.springframework.data.web.PageableHandlerMethodArgumentResolver())
                 .build();
         objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());

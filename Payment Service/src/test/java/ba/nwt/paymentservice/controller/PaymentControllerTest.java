@@ -41,6 +41,7 @@ class PaymentControllerTest {
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(paymentController)
                 .setControllerAdvice(new GlobalExceptionHandler())
+                .setCustomArgumentResolvers(new org.springframework.data.web.PageableHandlerMethodArgumentResolver())
                 .build();
         objectMapper = new ObjectMapper();
     }

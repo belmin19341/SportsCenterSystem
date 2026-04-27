@@ -8,6 +8,7 @@ import ba.nwt.paymentservice.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -44,6 +45,7 @@ public class NotificationService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public NotificationResponseDTO create(NotificationRequestDTO dto) {
         Notification notification = Notification.builder()
                 .userId(dto.getUserId())
@@ -58,6 +60,33 @@ public class NotificationService {
         return modelMapper.map(saved, NotificationResponseDTO.class);
     }
 
+    /**
+     * Atomically persists a batch of notifications (e.g. fan-out to many users).
+     * Either all rows commit together or none do.
+     */
+    @Transactional
+    public List<NotificationResponseDTO> createBatch(List<NotificationRequestDTO> dtos) {
+        if (dtos == null || dtos.isEmpty()) {
+            throw new IllegalArgumentException("Batch must contain at least one notification");
+        }
+        List<Notification> entities = new java.util.ArrayList<>(dtos.size());
+        LocalDateTime now = LocalDateTime.now();
+        for (NotificationRequestDTO dto : dtos) {
+            entities.add(Notification.builder()
+                    .userId(dto.getUserId())
+                    .type(dto.getType())
+                    .subject(dto.getSubject())
+                    .message(dto.getMessage())
+                    .sentAt(now)
+                    .isRead(false)
+                    .build());
+        }
+        return notificationRepository.saveAll(entities).stream()
+                .map(n -> modelMapper.map(n, NotificationResponseDTO.class))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
     public NotificationResponseDTO markAsRead(Long id) {
         Notification notification = notificationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Notification not found with id: " + id));
@@ -66,6 +95,7 @@ public class NotificationService {
         return modelMapper.map(saved, NotificationResponseDTO.class);
     }
 
+    @Transactional
     public void delete(Long id) {
         if (!notificationRepository.existsById(id)) {
             throw new ResourceNotFoundException("Notification not found with id: " + id);

@@ -43,6 +43,19 @@ public class AchievementService {
         return modelMapper.map(saved, AchievementResponseDTO.class);
     }
 
+    @org.springframework.transaction.annotation.Transactional
+    public List<AchievementResponseDTO> createBatch(List<AchievementRequestDTO> dtos) {
+        if (dtos == null || dtos.isEmpty()) {
+            throw new IllegalArgumentException("Batch must contain at least one achievement");
+        }
+        List<Achievement> entities = dtos.stream()
+                .map(d -> modelMapper.map(d, Achievement.class))
+                .collect(Collectors.toList());
+        return achievementRepository.saveAll(entities).stream()
+                .map(a -> modelMapper.map(a, AchievementResponseDTO.class))
+                .collect(Collectors.toList());
+    }
+
     public AchievementResponseDTO updateAchievement(Long id, AchievementRequestDTO dto) {
         Achievement achievement = achievementRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Achievement not found with id: " + id));

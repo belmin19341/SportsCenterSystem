@@ -9,7 +9,9 @@ import ba.nwt.resourceservice.repository.EquipmentRepository;
 import ba.nwt.resourceservice.repository.FacilityRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -98,6 +100,40 @@ public class EquipmentService {
 
         Equipment saved = equipmentRepository.save(equipment);
         return toResponseDTO(saved);
+    }
+
+    @Transactional
+    public List<EquipmentResponseDTO> createBatch(List<EquipmentRequestDTO> dtos) {
+        if (dtos == null || dtos.isEmpty()) {
+            throw new IllegalArgumentException("Batch must contain at least one equipment item");
+        }
+        List<Equipment> entities = new ArrayList<>(dtos.size());
+        for (EquipmentRequestDTO dto : dtos) {
+            Facility facility = null;
+            if (dto.getFacilityId() != null) {
+                facility = facilityRepository.findById(dto.getFacilityId())
+                        .orElseThrow(() -> new ResourceNotFoundException(
+                                "Facility not found with id: " + dto.getFacilityId()));
+            }
+            if (dto.getQuantityAvailable() > dto.getQuantityTotal()) {
+                throw new IllegalArgumentException("Available quantity cannot exceed total quantity");
+            }
+            entities.add(Equipment.builder()
+                    .facility(facility)
+                    .name(dto.getName())
+                    .type(dto.getType())
+                    .category(dto.getCategory())
+                    .quantityTotal(dto.getQuantityTotal())
+                    .quantityAvailable(dto.getQuantityAvailable())
+                    .pricePerDay(dto.getPricePerDay())
+                    .equipmentCondition(dto.getEquipmentCondition() != null
+                            ? dto.getEquipmentCondition() : Equipment.EquipmentCondition.NEW)
+                    .depositRequired(dto.getDepositRequired())
+                    .build());
+        }
+        return equipmentRepository.saveAll(entities).stream()
+                .map(this::toResponseDTO)
+                .collect(Collectors.toList());
     }
 
     public void delete(Long id) {

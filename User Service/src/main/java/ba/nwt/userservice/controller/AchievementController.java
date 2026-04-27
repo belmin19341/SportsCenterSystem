@@ -46,6 +46,12 @@ public class AchievementController {
         return ResponseEntity.status(HttpStatus.CREATED).body(achievementService.createAchievement(dto));
     }
 
+    @PostMapping("/batch")
+    @Operation(summary = "Create multiple achievements in a single transaction")
+    public ResponseEntity<List<AchievementResponseDTO>> createBatch(@Valid @RequestBody List<AchievementRequestDTO> dtos) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(achievementService.createBatch(dtos));
+    }
+
     @PutMapping("/{id}")
     @Operation(summary = "Update an achievement")
     public ResponseEntity<AchievementResponseDTO> update(@PathVariable Long id, @Valid @RequestBody AchievementRequestDTO dto) {

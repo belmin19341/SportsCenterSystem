@@ -7,9 +7,17 @@ import ba.nwt.resourceservice.model.Facility;
 import ba.nwt.resourceservice.model.PricingRule;
 import ba.nwt.resourceservice.repository.FacilityRepository;
 import ba.nwt.resourceservice.repository.PricingRuleRepository;
+import lombok.Builder;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -86,6 +94,56 @@ public class PricingRuleService {
             throw new ResourceNotFoundException("Pricing rule not found with id: " + id);
         }
         pricingRuleRepository.deleteById(id);
+    }
+
+    /**
+     * Calculates the rental price for a facility over a time window by
+     * combining the facility's base price with any applicable pricing rules
+     * (matching day-of-week and overlapping time slot). Spans two repos in
+     * a single read-only transaction.
+     */
+    @Transactional(readOnly = true)
+    public PriceQuote calculatePrice(Long facilityId, LocalDateTime start, LocalDateTime end) {
+        if (!end.isAfter(start)) {
+            throw new IllegalArgumentException("End must be after start");
+        }
+        Facility facility = facilityRepository.findById(facilityId)
+                .orElseThrow(() -> new ResourceNotFoundException("Facility not found with id: " + facilityId));
+
+        BigDecimal hours = BigDecimal.valueOf(Duration.between(start, end).toMinutes())
+                .divide(BigDecimal.valueOf(60), 4, RoundingMode.HALF_UP);
+        BigDecimal basePrice = facility.getBasePricePerHour().multiply(hours);
+
+        PricingRule.DayOfWeekEnum dow = PricingRule.DayOfWeekEnum.valueOf(start.getDayOfWeek().name());
+        LocalTime startT = start.toLocalTime();
+        LocalTime endT = end.toLocalTime();
+
+        BigDecimal multiplier = pricingRuleRepository.findByFacilityId(facilityId).stream()
+                .filter(r -> r.getDayOfWeek() == null || r.getDayOfWeek() == dow)
+                .filter(r -> startT.isBefore(r.getTimeSlotEnd()) && endT.isAfter(r.getTimeSlotStart()))
+                .map(PricingRule::getPriceMultiplier)
+                .reduce(BigDecimal.ONE, BigDecimal::multiply);
+
+        BigDecimal total = basePrice.multiply(multiplier).setScale(2, RoundingMode.HALF_UP);
+        return PriceQuote.builder()
+                .facilityId(facilityId)
+                .start(start).end(end)
+                .basePricePerHour(facility.getBasePricePerHour())
+                .hours(hours)
+                .multiplier(multiplier)
+                .totalPrice(total)
+                .build();
+    }
+
+    @Data @Builder
+    public static class PriceQuote {
+        private Long facilityId;
+        private LocalDateTime start;
+        private LocalDateTime end;
+        private BigDecimal basePricePerHour;
+        private BigDecimal hours;
+        private BigDecimal multiplier;
+        private BigDecimal totalPrice;
     }
 
     private PricingRuleResponseDTO toResponseDTO(PricingRule rule) {
