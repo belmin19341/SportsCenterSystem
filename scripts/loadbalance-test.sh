@@ -2,8 +2,18 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 # Spring Cloud LoadBalancer demo — sends N requests against Booking Service's
 # /api/lb-demo/resource-instance endpoint, which fans out to resource-service via
-# the load-balanced RestTemplate. Each upstream Resource Service instance stamps
-# the response with its X-Instance-Id; we tally the distribution and latency.
+# the load-balanced RestTemplate. Internally calls the non-trivial business endpoint:
+#
+#   GET /api/pricing-rules/calculate?facilityId=1&start=...&end=...
+#
+# This endpoint executes a transactional @EntityGraph query on PricingRule,
+# applies multi-rule multipliers (time-slot + day-of-week), and returns a
+# PriceQuote — demonstrating that real business logic is distributed across
+# Resource Service instances, not just a trivial health check.
+#
+# Each upstream Resource Service instance stamps the response with X-Instance-Id;
+# we tally the distribution and latency via the X-Upstream-Instance header
+# bubbled back by Booking Service.
 #
 # Prerequisite: ./run-services.sh --lb  (starts a 2nd Resource Service instance)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -42,7 +52,8 @@ AVG_MS=$((TOTAL_MS / SUCCESS))
 {
     echo "# Spring Cloud LoadBalancer — Distribution Report"
     echo ""
-    echo "- Endpoint: \`$URL\`"
+    echo "- Booking Service endpoint: \`$URL\`"
+    echo "- Upstream Resource Service endpoint: \`GET /api/pricing-rules/calculate\` (transactional EntityGraph + multi-rule price calc)"
     echo "- Requests sent: $N"
     echo "- Successful responses: $SUCCESS"
     echo "- Average latency: ${AVG_MS} ms"
