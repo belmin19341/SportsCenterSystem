@@ -111,6 +111,16 @@ public class BookingController {
         return ResponseEntity.status(HttpStatus.CREATED).body(bookingService.create(dto));
     }
 
+    @PostMapping("/orchestrated")
+    @Operation(summary = "Z5 — Create a booking via synchronous inter-service orchestration "
+            + "(Resource: validate+price → Payment: charge → User: loyalty)")
+    public ResponseEntity<BookingResponseDTO> createOrchestrated(
+            @Valid @RequestBody BookingRequestDTO dto,
+            @RequestParam(defaultValue = "CREDIT_CARD") String paymentMethod) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(bookingService.createOrchestrated(dto, paymentMethod));
+    }
+
     @PutMapping("/{id}")
     @Operation(summary = "Update a booking")
     public ResponseEntity<BookingResponseDTO> update(@PathVariable Long id, @Valid @RequestBody BookingRequestDTO dto) {

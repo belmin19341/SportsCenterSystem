@@ -1,5 +1,12 @@
 package ba.nwt.bookingservice.service;
 
+import ba.nwt.bookingservice.client.PaymentServiceClient;
+import ba.nwt.bookingservice.client.ResourceServiceClient;
+import ba.nwt.bookingservice.client.UserServiceClient;
+import ba.nwt.bookingservice.client.dto.FacilityView;
+import ba.nwt.bookingservice.client.dto.PaymentCreateView;
+import ba.nwt.bookingservice.client.dto.PaymentView;
+import ba.nwt.bookingservice.client.dto.PriceQuoteView;
 import ba.nwt.bookingservice.config.JsonPatchUtil;
 import ba.nwt.bookingservice.dto.BookingRequestDTO;
 import ba.nwt.bookingservice.dto.BookingResponseDTO;
@@ -13,6 +20,8 @@ import ba.nwt.bookingservice.repository.BookingUserRepository;
 import com.github.fge.jsonpatch.JsonPatch;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -30,10 +39,15 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class BookingService {
 
+    private static final Logger log = LoggerFactory.getLogger(BookingService.class);
+
     private final BookingRepository bookingRepository;
     private final BookingUserRepository bookingUserRepository;
     private final ModelMapper modelMapper;
     private final JsonPatchUtil jsonPatchUtil;
+    private final ResourceServiceClient resourceServiceClient;
+    private final PaymentServiceClient paymentServiceClient;
+    private final UserServiceClient userServiceClient;
 
     public List<BookingResponseDTO> getAll() {
         return bookingRepository.findAll().stream()
@@ -243,6 +257,90 @@ public class BookingService {
             throw new ResourceNotFoundException("Booking not found with id: " + id);
         }
         bookingRepository.deleteById(id);
+    }
+
+    /**
+     * Z5 — Synchronous orchestration of a Booking across 4 services:
+     *   1. Resource Service: validate facility (must exist and be ACTIVE).
+     *   2. Resource Service: compute authoritative price (overrides client-supplied total).
+     *   3. Payment Service: charge amount; on success booking is CONFIRMED.
+     *   4. User Service: credit loyalty points (best-effort; failure does NOT roll back booking).
+     *
+     * Failure semantics:
+     *   - Resource down OR facility inactive  → 503/400, NO booking persisted.
+     *   - Payment down OR payment FAILED      → booking persisted as CANCELLED, exception bubbles.
+     *   - User Service down                   → booking stays CONFIRMED, warning logged.
+     */
+    @Transactional
+    public BookingResponseDTO createOrchestrated(BookingRequestDTO dto, String paymentMethod) {
+        if (dto.getEndTime().isBefore(dto.getStartTime())) {
+            throw new IllegalArgumentException("End time must be after start time");
+        }
+
+        // Step 1 — facility validation (mandatory)
+        FacilityView facility = resourceServiceClient.getFacility(dto.getFacilityId());
+        if (facility == null || facility.getStatus() == null
+                || !"ACTIVE".equalsIgnoreCase(facility.getStatus())) {
+            throw new IllegalArgumentException(
+                    "Facility " + dto.getFacilityId() + " is not bookable (status="
+                            + (facility == null ? "null" : facility.getStatus()) + ")");
+        }
+
+        // Step 2 — authoritative price (mandatory)
+        PriceQuoteView quote = resourceServiceClient.calculatePrice(
+                dto.getFacilityId(), dto.getStartTime(), dto.getEndTime());
+        if (quote == null || quote.getTotalPrice() == null) {
+            throw new IllegalArgumentException("Pricing service returned no quote for facility "
+                    + dto.getFacilityId());
+        }
+        java.math.BigDecimal authoritativePrice = quote.getTotalPrice();
+
+        // Persist booking PENDING — happens before payment so we have an ID to reference.
+        Booking booking = bookingRepository.save(Booking.builder()
+                .userId(dto.getUserId())
+                .facilityId(dto.getFacilityId())
+                .startTime(dto.getStartTime())
+                .endTime(dto.getEndTime())
+                .totalPrice(authoritativePrice)
+                .isRecurring(dto.getIsRecurring() != null ? dto.getIsRecurring() : false)
+                .recurringPattern(dto.getRecurringPattern())
+                .status(Booking.BookingStatus.PENDING)
+                .build());
+
+        // Step 3 — charge (mandatory; on any failure mark booking CANCELLED and rethrow)
+        PaymentView payment;
+        try {
+            payment = paymentServiceClient.createPayment(PaymentCreateView.builder()
+                    .bookingId(booking.getId())
+                    .amount(authoritativePrice)
+                    .paymentMethod(paymentMethod == null ? "CREDIT_CARD" : paymentMethod)
+                    .build());
+        } catch (RuntimeException ex) {
+            booking.setStatus(Booking.BookingStatus.CANCELLED);
+            bookingRepository.save(booking);
+            throw ex;
+        }
+        if (payment == null || !"PAID".equalsIgnoreCase(payment.getStatus())) {
+            booking.setStatus(Booking.BookingStatus.CANCELLED);
+            bookingRepository.save(booking);
+            throw new IllegalArgumentException("Payment did not succeed (status="
+                    + (payment == null ? "null" : payment.getStatus()) + ")");
+        }
+        booking.setStatus(Booking.BookingStatus.CONFIRMED);
+        bookingRepository.save(booking);
+
+        // Step 4 — loyalty (best-effort; never blocks confirmation)
+        try {
+            int points = authoritativePrice.setScale(0, java.math.RoundingMode.DOWN).intValueExact();
+            if (points > 0) {
+                userServiceClient.addLoyaltyPoints(dto.getUserId(), points);
+            }
+        } catch (RuntimeException ex) {
+            log.warn("Loyalty credit failed for booking {} (user {}): {}",
+                    booking.getId(), dto.getUserId(), ex.toString());
+        }
+
+        return modelMapper.map(booking, BookingResponseDTO.class);
     }
 }
 

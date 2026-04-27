@@ -1,5 +1,8 @@
 package ba.nwt.bookingservice.service;
 
+import ba.nwt.bookingservice.client.PaymentServiceClient;
+import ba.nwt.bookingservice.client.ResourceServiceClient;
+import ba.nwt.bookingservice.client.UserServiceClient;
 import ba.nwt.bookingservice.dto.BookingRequestDTO;
 import ba.nwt.bookingservice.dto.BookingResponseDTO;
 import ba.nwt.bookingservice.exception.ResourceNotFoundException;
@@ -31,6 +34,15 @@ class BookingServiceTest {
 
     @Mock
     private ModelMapper modelMapper;
+
+    @Mock
+    private ResourceServiceClient resourceServiceClient;
+
+    @Mock
+    private PaymentServiceClient paymentServiceClient;
+
+    @Mock
+    private UserServiceClient userServiceClient;
 
     @InjectMocks
     private BookingService bookingService;

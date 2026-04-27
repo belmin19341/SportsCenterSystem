@@ -66,6 +66,32 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 
+    @ExceptionHandler(ba.nwt.bookingservice.exception.DownstreamUnavailableException.class)
+    public ResponseEntity<ApiError> handleDownstreamUnavailable(
+            ba.nwt.bookingservice.exception.DownstreamUnavailableException ex) {
+        ApiError error = ApiError.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.SERVICE_UNAVAILABLE.value())
+                .error("Service Unavailable")
+                .message(ex.getMessage())
+                .details(List.of("downstream: " + ex.getService()))
+                .build();
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(error);
+    }
+
+    @ExceptionHandler(ba.nwt.bookingservice.exception.DownstreamBadRequestException.class)
+    public ResponseEntity<ApiError> handleDownstreamBadRequest(
+            ba.nwt.bookingservice.exception.DownstreamBadRequestException ex) {
+        ApiError error = ApiError.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Bad Request")
+                .message(ex.getMessage())
+                .details(List.of("downstream: " + ex.getService(), "downstreamStatus: " + ex.getStatus()))
+                .build();
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGeneral(Exception ex) {
         ApiError error = ApiError.builder()
