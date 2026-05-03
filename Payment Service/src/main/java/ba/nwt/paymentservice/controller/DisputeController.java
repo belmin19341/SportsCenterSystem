@@ -52,6 +52,13 @@ public class DisputeController {
         return ResponseEntity.status(HttpStatus.CREATED).body(disputeService.create(dto));
     }
 
+    @PatchMapping(value = "/{id}", consumes = "application/json-patch+json")
+    @Operation(summary = "Partially update a dispute (RFC 6902 JSON Patch)")
+    public ResponseEntity<DisputeResponseDTO> patch(@PathVariable Long id,
+                                                    @RequestBody com.github.fge.jsonpatch.JsonPatch patch) {
+        return ResponseEntity.ok(disputeService.patch(id, patch));
+    }
+
     @PatchMapping("/{id}/resolve")
     @Operation(summary = "Resolve a dispute")
     public ResponseEntity<DisputeResponseDTO> resolve(@PathVariable Long id, @RequestParam String resolutionNote) {

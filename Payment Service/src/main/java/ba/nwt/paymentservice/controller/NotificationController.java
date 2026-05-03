@@ -51,6 +51,13 @@ public class NotificationController {
         return ResponseEntity.status(HttpStatus.CREATED).body(notificationService.create(dto));
     }
 
+    @PostMapping("/batch")
+    @Operation(summary = "Create a batch of notifications atomically")
+    public ResponseEntity<List<NotificationResponseDTO>> createBatch(
+            @Valid @RequestBody java.util.List<NotificationRequestDTO> dtos) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(notificationService.createBatch(dtos));
+    }
+
     @PatchMapping("/{id}/read")
     @Operation(summary = "Mark notification as read")
     public ResponseEntity<NotificationResponseDTO> markAsRead(@PathVariable Long id) {

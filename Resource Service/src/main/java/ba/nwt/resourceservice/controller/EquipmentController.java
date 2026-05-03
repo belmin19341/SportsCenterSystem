@@ -52,6 +52,13 @@ public class EquipmentController {
         return ResponseEntity.status(HttpStatus.CREATED).body(equipmentService.create(dto));
     }
 
+    @PostMapping("/batch")
+    @Operation(summary = "Create equipment in batch (transactional)")
+    public ResponseEntity<List<EquipmentResponseDTO>> createBatch(
+            @Valid @RequestBody List<EquipmentRequestDTO> dtos) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(equipmentService.createBatch(dtos));
+    }
+
     @PutMapping("/{id}")
     @Operation(summary = "Update equipment")
     public ResponseEntity<EquipmentResponseDTO> update(@PathVariable Long id, @Valid @RequestBody EquipmentRequestDTO dto) {
