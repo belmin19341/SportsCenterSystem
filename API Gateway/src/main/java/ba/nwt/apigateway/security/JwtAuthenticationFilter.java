@@ -2,9 +2,11 @@ package ba.nwt.apigateway.security;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
@@ -16,8 +18,11 @@ import java.util.*;
 
 /**
  * JWT Authentication Filter Factory for Spring Cloud Gateway
- * Validates JWT tokens and adds user information to request headers
- * Also enforces role-based access control (RBAC)
+ * - validates JWT token signature and expiration
+ * - rejects blacklisted (logged-out) tokens via {@link TokenBlacklistService}
+ * - applies a per-IP rate limit on /api/auth/login via {@link RateLimitService}
+ * - enforces role-based access control (RBAC) using prefix-matching
+ * - propagates user info via {@code X-User-Id}, {@code X-User-Name}, {@code X-User-Role} headers
  */
 @Slf4j
 @Component
@@ -26,29 +31,42 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
     @Autowired
     private JwtValidator jwtValidator;
 
-    // Role-based route permissions
-    private static final Map<String, Set<String>> ROLE_PERMISSIONS = Map.ofEntries(
-            // USER role - limited access
-            Map.entry("USER", new HashSet<>(Arrays.asList(
-                    "/api/users/profile",
-                    "/api/users/me",
-                    "/api/bookings/my-bookings",
-                    "/api/bookings/create",
-                    "/api/resources/list",
-                    "/api/payments/my-payments"
-            ))),
-            // OWNER role - facility management
-            Map.entry("OWNER", new HashSet<>(Arrays.asList(
-                    "/api/users/profile",
-                    "/api/users/me",
-                    "/api/resources/**",
+    @Autowired
+    private TokenBlacklistService blacklist;
+
+    @Autowired
+    private RateLimitService rateLimitService;
+
+    @Value("${security.ratelimit.login.enabled:true}")
+    private boolean rateLimitEnabled;
+
+    /**
+     * RBAC matrix: role -> array of path prefixes (or "**" for full access).
+     * Path is matched via {@link #pathAllowed(String, String)} using:
+     *   - exact match
+     *   - "/foo/**" prefix match
+     *   - "**" wildcard
+     *
+     * Note on USER permissions:
+     *   USER can call all booking, payment and resource endpoints. Object-level
+     *   ownership (e.g. "user X may only update their own booking") is the
+     *   responsibility of each downstream service, which receives X-User-Id and
+     *   X-User-Role headers from the gateway.
+     */
+    private static final Map<String, String[]> ROLE_PERMISSIONS = Map.of(
+            "USER",  new String[]{
+                    "/api/users/**",
                     "/api/bookings/**",
-                    "/api/payments/**"
-            ))),
-            // ADMIN role - full access
-            Map.entry("ADMIN", new HashSet<>(Arrays.asList(
-                    "/api/**"
-            )))
+                    "/api/payments/**",
+                    "/api/resources/**"
+            },
+            "OWNER", new String[]{
+                    "/api/users/**",
+                    "/api/bookings/**",
+                    "/api/payments/**",
+                    "/api/resources/**"
+            },
+            "ADMIN", new String[]{ "**" }
     );
 
     public JwtAuthenticationFilter() {
@@ -60,8 +78,22 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
         return (exchange, chain) -> {
             ServerHttpRequest request = exchange.getRequest();
             String path = request.getPath().value();
+            HttpMethod method = request.getMethod();
 
-            // Routes that don't require authentication
+            // ── Per-IP rate limit on /api/auth/login (POST) ────────────────────
+            if (rateLimitEnabled
+                    && HttpMethod.POST.equals(method)
+                    && path.endsWith("/api/auth/login")) {
+                String ip = clientIp(request);
+                if (rateLimitService.isLimited(ip)) {
+                    return onError(exchange,
+                            "Too many login attempts. Please retry after "
+                                    + rateLimitService.getWindowSeconds() + " seconds.",
+                            HttpStatus.TOO_MANY_REQUESTS);
+                }
+            }
+
+            // Public routes do not require a token
             if (isPublicRoute(path)) {
                 return chain.filter(exchange);
             }
@@ -86,14 +118,29 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
                     return onError(exchange, "Invalid or expired token", HttpStatus.UNAUTHORIZED);
                 }
 
+                // Reject revoked (logged-out) tokens
+                String jti = jwtValidator.getJtiFromToken(token);
+                if (blacklist.isBlacklisted(jti)) {
+                    log.warn("Blacklisted token used: jti={}", jti);
+                    return onError(exchange, "Token has been revoked (logged out)", HttpStatus.UNAUTHORIZED);
+                }
+
                 // Extract user information from token
                 Long userId = jwtValidator.getUserIdFromToken(token);
                 String username = jwtValidator.getUsernameFromToken(token);
                 String role = jwtValidator.getRoleFromToken(token);
 
+                // Refresh tokens may not be used as access tokens (only on /api/auth/refresh)
+                Object type = jwtValidator.getAllClaims(token).get("type");
+                if (type != null && "refresh".equalsIgnoreCase(type.toString())) {
+                    log.warn("Refresh token used as access token by user '{}'", username);
+                    return onError(exchange, "Refresh token cannot be used to access protected resources",
+                            HttpStatus.UNAUTHORIZED);
+                }
+
                 // Check role-based access control
                 if (!hasAccessToPath(role, path)) {
-                    log.warn("User '{}' with role '{}' attempting unauthorized access to: {}", 
+                    log.warn("User '{}' with role '{}' attempting unauthorized access to: {}",
                             username, role, path);
                     return onError(exchange, "Insufficient permissions for this resource", HttpStatus.FORBIDDEN);
                 }
@@ -117,45 +164,68 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
     }
 
     /**
-     * Check if route is public (doesn't require authentication)
+     * Public routes that bypass JWT validation.
+     * - /api/auth/login, /api/auth/refresh — credential / token exchange
+     * - /api/auth/logout — revokes the bearer token; user-service inspects the
+     *   Authorization header internally and tolerates missing / invalid tokens
+     * - /api/auth/validate — used by clients to check token state
+     * - swagger / openapi / actuator / health — operational endpoints
      */
     private boolean isPublicRoute(String path) {
-        return path.contains("/auth/login") ||
-                path.contains("/auth/validate") ||
-                path.contains("/api-docs") ||
-                path.contains("/swagger-ui") ||
-                path.contains("/health") ||
-                path.contains("/actuator");
+        return path.endsWith("/api/auth/login")
+                || path.endsWith("/api/auth/refresh")
+                || path.endsWith("/api/auth/logout")
+                || path.endsWith("/api/auth/validate")
+                || path.contains("/api-docs")
+                || path.contains("/swagger-ui")
+                || path.contains("/swagger-resources")
+                || path.contains("/v3/api-docs")
+                || path.endsWith("/health")
+                || path.startsWith("/actuator");
     }
 
     /**
      * Check if user role has access to the requested path
      */
     private boolean hasAccessToPath(String role, String path) {
-        Set<String> permissions = ROLE_PERMISSIONS.get(role);
-        if (permissions == null) {
+        if (role == null) {
             return false;
         }
-
-        // Check for exact or wildcard matches
-        for (String permission : permissions) {
-            if (permission.equals(path) || matchesWildcard(permission, path)) {
+        String[] patterns = ROLE_PERMISSIONS.get(role.toUpperCase(Locale.ROOT));
+        if (patterns == null) {
+            return false;
+        }
+        for (String pattern : patterns) {
+            if (pathAllowed(pattern, path)) {
                 return true;
             }
         }
-
         return false;
     }
 
-    /**
-     * Check if path matches wildcard permission pattern
-     */
-    private boolean matchesWildcard(String pattern, String path) {
+    /** Match "/foo/**", "/foo/bar" or "**" against the request path. */
+    private boolean pathAllowed(String pattern, String path) {
+        if ("**".equals(pattern) || "/**".equals(pattern)) {
+            return true;
+        }
         if (pattern.endsWith("/**")) {
             String prefix = pattern.substring(0, pattern.length() - 3);
-            return path.startsWith(prefix);
+            return path.equals(prefix) || path.startsWith(prefix + "/") || path.startsWith(prefix);
         }
-        return false;
+        return pattern.equals(path);
+    }
+
+    /** Best-effort client IP extraction (X-Forwarded-For or remote address). */
+    private String clientIp(ServerHttpRequest request) {
+        String xff = request.getHeaders().getFirst("X-Forwarded-For");
+        if (xff != null && !xff.isBlank()) {
+            int comma = xff.indexOf(',');
+            return (comma > 0 ? xff.substring(0, comma) : xff).trim();
+        }
+        if (request.getRemoteAddress() != null && request.getRemoteAddress().getAddress() != null) {
+            return request.getRemoteAddress().getAddress().getHostAddress();
+        }
+        return "unknown";
     }
 
     /**
@@ -166,10 +236,19 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
         response.setStatusCode(status);
         response.getHeaders().add("Content-Type", "application/json");
 
+        // Uniform error format aligned with downstream services' ApiError shape:
+        //   { "error": "<short error label>", "status": <int>, "message": "<details>" }
+        String errorLabel;
+        switch (status) {
+            case UNAUTHORIZED -> errorLabel = "Unauthorized";
+            case FORBIDDEN -> errorLabel = "Forbidden";
+            case TOO_MANY_REQUESTS -> errorLabel = "Too Many Requests";
+            default -> errorLabel = "Error";
+        }
+
         String errorBody = String.format(
-                "{\"error\":\"%s\",\"status\":%d}",
-                message,
-                status.value()
+                "{\"error\":\"%s\",\"status\":%d,\"message\":\"%s\"}",
+                errorLabel, status.value(), message.replace("\"", "\\\"")
         );
 
         return response.writeWith(

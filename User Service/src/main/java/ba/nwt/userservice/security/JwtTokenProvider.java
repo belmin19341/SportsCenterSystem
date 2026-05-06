@@ -14,8 +14,14 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * JWT (JSON Web Token) Utility Component
- * Handles token generation, validation, and claims extraction
+ * JWT (JSON Web Token) Utility Component.
+ *
+ * Generates two distinct token types:
+ *   - access  (short-lived, default 15 min) → carried in Authorization: Bearer …
+ *   - refresh (long-lived,  default  7 days) → only valid on POST /api/auth/refresh
+ *
+ * Both tokens carry a unique {@code jti} so they can be revoked individually
+ * via the gateway blacklist (access) or the local refresh blacklist (refresh).
  */
 @Component
 public class JwtTokenProvider {
@@ -23,46 +29,71 @@ public class JwtTokenProvider {
     @Value("${jwt.secret:SportsCenterSystemSecretKeyForJWTTokenDevelopmentOnly2026}")
     private String jwtSecret;
 
-    @Value("${jwt.expiration:86400}")  // 1 day in seconds
-    private long jwtExpirationMs;
+    /** Access token TTL in seconds. Backwards-compatible with the old jwt.expiration property. */
+    @Value("${jwt.access.expiration:${jwt.expiration:900}}")
+    private long accessTokenExpirationSec;
+
+    /** Refresh token TTL in seconds (default 7 days). */
+    @Value("${jwt.refresh.expiration:604800}")
+    private long refreshTokenExpirationSec;
 
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes());
     }
 
+    /* ────────────────────────────────────────────────────────────────────── *
+     *  Token generation
+     * ────────────────────────────────────────────────────────────────────── */
+
     /**
-     * Generate JWT token for authenticated user
+     * Generate a short-lived ACCESS token used as Authorization: Bearer …
      */
-    public String generateToken(Long userId, String username, String email, String role) {
+    public String generateAccessToken(Long userId, String username, String email, String role) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("username", username);
         claims.put("email", email);
         claims.put("role", role);
-        claims.put("roles", new String[]{role});  // Array format for compatibility
-        claims.put("jti", UUID.randomUUID().toString());  // JWT ID for potential revocation
-
-        return createToken(claims, userId.toString());
+        claims.put("roles", new String[]{role});
+        claims.put("type", "access");
+        claims.put("jti", UUID.randomUUID().toString());
+        return createToken(claims, userId.toString(), accessTokenExpirationSec);
     }
 
     /**
-     * Create token with specified claims and subject
+     * Generate a long-lived REFRESH token. Used only by POST /api/auth/refresh
+     * to mint new access tokens. Cannot be used to access protected resources
+     * (the gateway rejects tokens with type=refresh).
      */
-    private String createToken(Map<String, Object> claims, String subject) {
-        Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + jwtExpirationMs * 1000);
+    public String generateRefreshToken(Long userId, String username, String role) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("username", username);
+        claims.put("role", role);
+        claims.put("type", "refresh");
+        claims.put("jti", UUID.randomUUID().toString());
+        return createToken(claims, userId.toString(), refreshTokenExpirationSec);
+    }
 
+    /** Backwards-compatible alias used in older tests / code paths. */
+    public String generateToken(Long userId, String username, String email, String role) {
+        return generateAccessToken(userId, username, email, role);
+    }
+
+    private String createToken(Map<String, Object> claims, String subject, long expirationSec) {
+        Date now = new Date();
+        Date expiry = new Date(now.getTime() + expirationSec * 1000);
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(subject)
                 .setIssuedAt(now)
-                .setExpiration(expiryDate)
+                .setExpiration(expiry)
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
-    /**
-     * Extract all claims from token
-     */
+    /* ────────────────────────────────────────────────────────────────────── *
+     *  Claim extraction
+     * ────────────────────────────────────────────────────────────────────── */
+
     public Claims getAllClaimsFromToken(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())
@@ -71,62 +102,64 @@ public class JwtTokenProvider {
                 .getBody();
     }
 
-    /**
-     * Get user ID (subject) from token
-     */
     public Long getUserIdFromToken(String token) {
-        Claims claims = getAllClaimsFromToken(token);
-        return Long.parseLong(claims.getSubject());
+        return Long.parseLong(getAllClaimsFromToken(token).getSubject());
     }
 
-    /**
-     * Get username from token
-     */
     public String getUsernameFromToken(String token) {
-        Claims claims = getAllClaimsFromToken(token);
-        return claims.get("username", String.class);
+        return getAllClaimsFromToken(token).get("username", String.class);
     }
 
-    /**
-     * Get role from token
-     */
     public String getRoleFromToken(String token) {
-        Claims claims = getAllClaimsFromToken(token);
-        return claims.get("role", String.class);
+        return getAllClaimsFromToken(token).get("role", String.class);
     }
 
-    /**
-     * Get expiration date from token
-     */
+    /** "access" or "refresh"; null for legacy tokens that did not carry the claim. */
+    public String getTypeFromToken(String token) {
+        Object t = getAllClaimsFromToken(token).get("type");
+        return t == null ? null : t.toString();
+    }
+
+    public String getJtiFromToken(String token) {
+        Claims claims = getAllClaimsFromToken(token);
+        String jti = claims.getId();
+        if (jti == null) {
+            Object o = claims.get("jti");
+            jti = o == null ? null : o.toString();
+        }
+        return jti;
+    }
+
     public Date getExpirationDateFromToken(String token) {
-        Claims claims = getAllClaimsFromToken(token);
-        return claims.getExpiration();
+        return getAllClaimsFromToken(token).getExpiration();
     }
 
-    /**
-     * Check if token is expired
-     */
+    /* ────────────────────────────────────────────────────────────────────── *
+     *  Validation
+     * ────────────────────────────────────────────────────────────────────── */
+
     public Boolean isTokenExpired(String token) {
         try {
-            Date expiration = getExpirationDateFromToken(token);
-            return expiration.before(new Date());
+            return getExpirationDateFromToken(token).before(new Date());
         } catch (Exception e) {
             return true;
         }
     }
 
-    /**
-     * Validate token - check signature and expiration
-     */
     public Boolean validateToken(String token) {
         try {
-            Jwts.parserBuilder()
-                    .setSigningKey(getSigningKey())
-                    .build()
-                    .parseClaimsJws(token);
+            Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(token);
             return !isTokenExpired(token);
         } catch (Exception e) {
             return false;
         }
+    }
+
+    public long getAccessTokenExpirationSec() {
+        return accessTokenExpirationSec;
+    }
+
+    public long getRefreshTokenExpirationSec() {
+        return refreshTokenExpirationSec;
     }
 }

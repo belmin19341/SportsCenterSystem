@@ -97,4 +97,26 @@ public class JwtValidator {
         Claims claims = getAllClaims(token);
         return claims.get("role", String.class);
     }
+
+    /**
+     * Get JTI (token id) used for blacklisting and audit.
+     */
+    public String getJtiFromToken(String token) {
+        Claims claims = getAllClaims(token);
+        // jti can be either the standard "jti" header or our explicit claim
+        String jti = claims.getId();
+        if (jti == null) {
+            Object o = claims.get("jti");
+            jti = o == null ? null : o.toString();
+        }
+        return jti;
+    }
+
+    /**
+     * Get the original expiration time as epoch milliseconds.
+     */
+    public long getExpirationEpochMs(String token) {
+        Claims claims = getAllClaims(token);
+        return claims.getExpiration().getTime();
+    }
 }

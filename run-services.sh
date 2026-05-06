@@ -6,7 +6,8 @@ set -e
 #   1) Config Server (8888)
 #   2) Eureka Discovery (8761)
 #   3) 4 mikroservisa (User/Resource/Booking/Payment)
-#   4) (opcionalno) druga instanca Resource Service-a za LB demo
+#   4) API Gateway (8080)
+#   5) (opcionalno) druga instanca Resource Service-a za LB demo
 # ═══════════════════════════════════════════════════════════════════
 
 if [ -f .env ]; then
@@ -19,6 +20,7 @@ fi
 
 CONFIG_PORT=${CONFIG_SERVER_PORT:-8888}
 EUREKA_PORT=${DISCOVERY_SERVER_PORT:-8761}
+GATEWAY_PORT=${API_GATEWAY_PORT:-8080}
 
 wait_for_health() {
     local url=$1; local name=$2; local tries=60
@@ -58,10 +60,18 @@ start_jar "resource-service ($RESOURCE_SERVICE_PORT)"  "Resource Service/target/
 start_jar "booking-service  ($BOOKING_SERVICE_PORT)"   "Booking Service/target/booking-service-0.0.1-SNAPSHOT.jar"    "/tmp/booking-service.log"
 start_jar "payment-service  ($PAYMENT_SERVICE_PORT)"   "Payment Service/target/payment-service-0.0.1-SNAPSHOT.jar"    "/tmp/payment-service.log"
 
+# Pričekaj user-service prije dizanja gateway-a (login ovisi o njemu)
+wait_for_health "http://localhost:${USER_SERVICE_PORT:-8081}/actuator/health" "user-service" || true
+
+echo ""
+echo "4️⃣  API Gateway ($GATEWAY_PORT)..."
+start_jar "api-gateway      ($GATEWAY_PORT)" "API Gateway/target/demo-0.0.1-SNAPSHOT.jar" "/tmp/api-gateway.log"
+wait_for_health "http://localhost:$GATEWAY_PORT/actuator/health" "api-gateway" || true
+
 if [ "$1" = "--lb" ]; then
     LB_PORT=${RESOURCE_SERVICE_PORT_2:-8092}
     echo ""
-    echo "4️⃣  Druga instanca Resource Service-a ($LB_PORT) za LB demo..."
+    echo "5️⃣  Druga instanca Resource Service-a ($LB_PORT) za LB demo..."
     SERVER_PORT=$LB_PORT \
     nohup java -jar "Resource Service/target/resource-service-0.0.1-SNAPSHOT.jar" \
         --server.port=$LB_PORT > /tmp/resource-service-2.log 2>&1 &
@@ -73,6 +83,7 @@ echo "════════════════════════�
 echo "✓ Sve pokrenuto."
 echo "  Eureka:    http://localhost:$EUREKA_PORT"
 echo "  Config:    http://localhost:$CONFIG_PORT/actuator/health"
+echo "  Gateway:   http://localhost:$GATEWAY_PORT/actuator/health"
 echo "  Swagger:   http://localhost:808X/swagger-ui.html"
 echo "  Logovi:    tail -f /tmp/<service>.log"
 echo "═══════════════════════════════════════════════════════════════"

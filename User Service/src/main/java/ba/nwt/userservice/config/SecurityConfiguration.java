@@ -9,8 +9,15 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.core.annotation.Order;
 
 /**
- * Spring Security Configuration
- * Configures authentication and authorization rules
+ * Spring Security Configuration for User Service.
+ *
+ * <p>The API Gateway is the security boundary: it validates JWT signature,
+ * expiration and blacklist before forwarding any request, and propagates
+ * {@code X-User-Id}, {@code X-User-Name}, {@code X-User-Role} headers.</p>
+ *
+ * <p>Therefore the User Service itself runs with permitAll() on all endpoints.
+ * In production the service port (8081) MUST NOT be exposed publicly — only the
+ * gateway port (8080) should be reachable from outside.</p>
  */
 @Configuration
 @EnableWebSecurity
@@ -19,8 +26,9 @@ public class SecurityConfiguration {
 
     /**
      * Configure security filter chain
-     * - Allow public access to authentication endpoints
-     * - Allow other endpoints (resources are protected in API Gateway)
+     * - Disable CSRF (not needed for stateless API)
+     * - Set session policy to stateless (JWT doesn't use sessions)
+     * - Permit all requests (API Gateway handles authentication)
      */
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -29,17 +37,8 @@ public class SecurityConfiguration {
             .csrf(csrf -> csrf.disable())
             // Set session policy to stateless (JWT doesn't use sessions)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            // Configure authorization rules
-            .authorizeHttpRequests(authz -> authz
-                // Public endpoints - no authentication required
-                .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/health").permitAll()
-                .requestMatchers("/actuator/**").permitAll()
-                .requestMatchers("/swagger-ui/**").permitAll()
-                .requestMatchers("/api-docs/**").permitAll()
-                // All other requests require authentication (but API Gateway handles JWT validation)
-                .anyRequest().authenticated()
-            )
+            // All requests are permitted — auth is enforced upstream by the API Gateway
+            .authorizeHttpRequests(authz -> authz.anyRequest().permitAll())
             // Disable default login form
             .formLogin(form -> form.disable())
             // Disable HTTP Basic authentication

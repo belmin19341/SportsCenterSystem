@@ -2,15 +2,24 @@ package ba.nwt.userservice.controller;
 
 import ba.nwt.userservice.dto.AuthResponseDTO;
 import ba.nwt.userservice.dto.LoginRequestDTO;
+import ba.nwt.userservice.dto.RefreshTokenRequestDTO;
 import ba.nwt.userservice.service.AuthenticationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 /**
  * Authentication Controller
- * Endpoints for user authentication and JWT token management
+ *
+ * Endpoints:
+ *   POST /api/auth/login    — exchange username+password for access + refresh tokens
+ *   POST /api/auth/refresh  — exchange a valid refresh token for a new access token
+ *   POST /api/auth/logout   — revoke the bearer (and optional refresh) token
+ *   POST /api/auth/validate — check whether a bearer token is still valid
  */
 @RestController
 @RequestMapping("/api/auth")
@@ -29,6 +38,42 @@ public class AuthenticationController {
     public ResponseEntity<AuthResponseDTO> login(@Valid @RequestBody LoginRequestDTO loginRequest) {
         AuthResponseDTO response = authenticationService.authenticate(loginRequest);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Refresh token endpoint - exchange a valid refresh token for a new access token
+     * 
+     * @param body Refresh token request containing the refresh token
+     * @return New access token and user information
+     */
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponseDTO> refresh(@Valid @RequestBody RefreshTokenRequestDTO body) {
+        return ResponseEntity.ok(authenticationService.refresh(body.getRefreshToken()));
+    }
+
+    /**
+     * Logout endpoint - revoke the bearer and optional refresh token
+     * 
+     * @param authHeader Authorization header containing "Bearer <token>"
+     * @param body Optional refresh token request
+     * @return Logout status message
+     */
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @RequestBody(required = false) RefreshTokenRequestDTO body) {
+
+        String accessToken = null;
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            accessToken = authHeader.substring(7);
+        }
+        String refreshToken = body == null ? null : body.getRefreshToken();
+        authenticationService.logout(accessToken, refreshToken);
+
+        return ResponseEntity.status(HttpStatus.OK).body(Map.of(
+                "logout", true,
+                "message", "Tokens revoked. Please discard local copies."
+        ));
     }
 
     /**
