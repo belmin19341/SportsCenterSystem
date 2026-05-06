@@ -9,7 +9,8 @@
 
 | Servis | Port | Opis |
 |--------|------|------|
-| **User Service** | 8081 | Korisnici, loyalty, achievements |
+| **API Gateway** | 8080 | JWT autentifikacija, RBAC, routing |
+| **User Service** | 8081 | Korisnici, autentifikacija, loyalty, achievements |
 | **Resource Service** | 8082 | Tereni, oprema, pricing pravila |
 | **Booking Service** | 8083 | Rezervacije, najam, recenzije |
 | **Payment Service** | 8084 | Plaćanja, notifikacije, dokumenti, sporovi |
@@ -197,6 +198,19 @@ Ako trebate znati koji port je korišten, pogledajte `application.properties` �
 
 ---
 
+## API Gateway & Autentifikacija
+
+Svi zahtjevi trebaju biti rutovani kroz **API Gateway** (port 8080) sa JWT Bearer tokenom:
+
+```bash
+POST http://localhost:8080/api/auth/login         # Login — vraća JWT token
+GET  http://localhost:8080/api/users/{id}         # Primjer — zahtjeva Bearer token
+```
+
+Test korisnici se kreiraju automatski pri startu: `john_doe`, `admin`, `vlasnik_teren` (različiti roles).
+
+---
+
 ## Struktura dostupnih podataka
 
 ### User Service (8081)
@@ -273,11 +287,28 @@ SportsCenterSystem/
 ├── README.md
 ├── ticket.txt
 │
+├── API Gateway/                # Port 8080
+│   ├── pom.xml
+│   └── src/main/java/ba/nwt/apigateway/
+│       ├── ApiGatewayApplication.java
+│       ├── security/
+│       │   ├── JwtValidator.java
+│       │   ├── JwtAuthenticationFilter.java
+│       │   └── GatewayConfig.java
+│
 ├── User Service/               # Port 8081
 │   ├── pom.xml
 │   └── src/main/java/ba/nwt/userservice/
 │       ├── UserServiceApplication.java
 │       ├── DataLoader.java
+│       ├── config/
+│       │   └── SecurityConfiguration.java
+│       ├── controller/
+│       │   └── AuthenticationController.java
+│       ├── service/
+│       │   └── AuthenticationService.java
+│       ├── security/
+│       │   └── JwtTokenProvider.java
 │       ├── model/
 │       │   ├── User.java
 │       │   ├── UserLoyalty.java
@@ -344,7 +375,7 @@ Svaki servis automatski unosi testne podatke pri prvom startu:
 
 | Servis | Podaci |
 |--------|--------|
-| User Service | 5 korisnika (admin, owner, 3 usera), 3 loyalty zapisa, 3 achievementa, 3 user-achievementa |
+| User Service | 5 korisnika (admin, owner, 3 usera), 3 loyalty zapisa, 3 achievementa, 3 user-achievementa + 3 test korisnika za JWT autentifikaciju |
 | Resource Service | 4 terena (football, padel, tenis), 4 komada opreme, 3 pricing pravila |
 | Booking Service | 4 rezervacije, 2 booking usera, 2 equipment rentala, 3 recenzije |
 | Payment Service | 4 plaćanja, 4 notifikacije, 2 dokumenta, 1 spor |
@@ -358,6 +389,8 @@ Svaki servis automatski unosi testne podatke pri prvom startu:
 - **Spring Boot 3.2.5**
 - **Java 17**
 - **MySQL 8.0** (Docker)
+- **Spring Cloud Gateway** (API Gateway, JWT validacija, RBAC routing)
+- **Spring Security** (JWT authentication, BCrypt password hashing)
 - **Hibernate / JPA** (ORM)
 - **Lombok** (boilerplate redukcija)
 - **Maven Wrapper** (`./mvnw`)
