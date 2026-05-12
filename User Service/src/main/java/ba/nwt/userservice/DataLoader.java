@@ -5,6 +5,7 @@ import ba.nwt.userservice.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -18,6 +19,7 @@ public class DataLoader implements CommandLineRunner {
     private final UserLoyaltyRepository userLoyaltyRepository;
     private final AchievementRepository achievementRepository;
     private final UserAchievementRepository userAchievementRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public void run(String... args) {
@@ -28,11 +30,20 @@ public class DataLoader implements CommandLineRunner {
 
         log.info(">>> Unosim početne podatke u User Service bazu...");
 
+        // ── Test korisnik za JWT autentifikaciju ──
+        User testUser = userRepository.save(User.builder()
+                .username("john_doe")
+                .email("john@example.com")
+                .passwordHash(passwordEncoder.encode("password123"))
+                .role(User.Role.USER)
+                .phone("+38761234567")
+                .build());
+
         // ── Korisnici ──
         User admin = userRepository.save(User.builder()
                 .username("admin")
                 .email("admin@sportcenter.ba")
-                .passwordHash("$2a$10$hashed_admin_password")
+                .passwordHash(passwordEncoder.encode("password123"))
                 .role(User.Role.ADMIN)
                 .phone("+38761000001")
                 .build());
@@ -40,7 +51,7 @@ public class DataLoader implements CommandLineRunner {
         User owner = userRepository.save(User.builder()
                 .username("vlasnik_teren")
                 .email("vlasnik@sportcenter.ba")
-                .passwordHash("$2a$10$hashed_owner_password")
+                .passwordHash(passwordEncoder.encode("password123"))
                 .role(User.Role.OWNER)
                 .phone("+38761000002")
                 .build());
@@ -48,7 +59,7 @@ public class DataLoader implements CommandLineRunner {
         User user1 = userRepository.save(User.builder()
                 .username("belmin_d")
                 .email("belmin@example.com")
-                .passwordHash("$2a$10$hashed_user1_password")
+                .passwordHash(passwordEncoder.encode("password123"))
                 .role(User.Role.USER)
                 .phone("+38762111111")
                 .build());
@@ -56,7 +67,7 @@ public class DataLoader implements CommandLineRunner {
         User user2 = userRepository.save(User.builder()
                 .username("harun_g")
                 .email("harun@example.com")
-                .passwordHash("$2a$10$hashed_user2_password")
+                .passwordHash(passwordEncoder.encode("password123"))
                 .role(User.Role.USER)
                 .phone("+38762222222")
                 .build());
@@ -64,7 +75,7 @@ public class DataLoader implements CommandLineRunner {
         User user3 = userRepository.save(User.builder()
                 .username("amar_h")
                 .email("amar@example.com")
-                .passwordHash("$2a$10$hashed_user3_password")
+                .passwordHash(passwordEncoder.encode("password123"))
                 .role(User.Role.USER)
                 .build());
 
