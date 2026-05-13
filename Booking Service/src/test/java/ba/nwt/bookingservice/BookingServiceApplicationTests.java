@@ -8,6 +8,10 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("test")
 class BookingServiceApplicationTests {
 
+    /** Mock RabbitTemplate so the context loads without a real RabbitMQ broker. */
+    @org.springframework.boot.test.mock.mockito.MockBean
+    private org.springframework.amqp.rabbit.core.RabbitTemplate rabbitTemplate;
+
     @Test
     void contextLoads() {
     }

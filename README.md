@@ -270,12 +270,15 @@ Test korisnici se kreiraju automatski pri startu: `john_doe`, `admin`, `vlasnik_
 ## Korisne Docker komande
 
 ```bash
-docker compose ps          # Status kontejnera
-docker compose logs -f     # Pratiti logove svih baza
-docker compose down        # Zaustavi kontejnere (podaci ostaju u volumeima)
-docker compose down -v     # Zaustavi i OBRIŠI sve podatke (fresh start)
-docker compose up -d       # Ponovo pokreni
+docker compose ps             # Status kontejnera (MySQL x4 + RabbitMQ)
+docker compose logs -f        # Pratiti logove svih servisa
+docker compose down           # Zaustavi kontejnere (podaci ostaju u volumeima)
+docker compose down -v        # Zaustavi i OBRIŠI sve podatke (fresh start)
+docker compose up -d          # Ponovo pokreni sve (MySQL + RabbitMQ)
+docker compose up rabbitmq -d # Pokreni samo RabbitMQ
 ```
+
+**RabbitMQ Management UI:** http://localhost:15672 (guest / guest)
 
 ---
 
@@ -384,14 +387,57 @@ Svaki servis automatski unosi testne podatke pri prvom startu:
 
 ---
 
+## Z7 — Asinhrona komunikacija (RabbitMQ Saga Choreography)
+
+### Brzi start
+
+```bash
+# 1. Pokrenuti RabbitMQ (dodan u docker-compose.yml)
+docker compose up rabbitmq -d
+
+# 2. Provjera — Management UI
+# http://localhost:15672  (guest / guest)
+```
+
+### Saga endpoint
+
+```bash
+# Sretni put — booking se potvrdi asinkrono
+POST http://localhost:8083/api/bookings/saga
+
+# Kompenzacijska transakcija — booking se otkaže ako payment padne
+POST http://localhost:8083/api/bookings/saga?simulateFailure=true
+```
+
+### Tok sage
+
+```
+POST /saga → Booking(PENDING) → BookingCreatedEvent → RabbitMQ
+                                                            ↓
+                                           Payment Service: Payment(PENDING→PAID)
+                                                            ↓
+                                        PaymentCompletedEvent → Booking(CONFIRMED) ← FINALNO
+
+Ako payment padne:  PaymentFailedEvent → Booking(CANCELLED) ← KOMPENZACIJA
+```
+
+### Detaljna dokumentacija
+
+- **`IZVJESTAJ_Z8_DETALJAN.md`** — Kompletan izvještaj sa svim objašnjenjima, dijagramima i uputama za testiranje
+- **`IZVJESTAJ_Z8.md`** — Sažetak implementacije
+
+---
+
 ## Tech Stack
 
 - **Spring Boot 3.2.5**
 - **Java 17**
 - **MySQL 8.0** (Docker)
+- **RabbitMQ 3.13** (Docker, AMQP 5672, Management UI 15672)
 - **Spring Cloud Gateway** (API Gateway, JWT validacija, RBAC routing)
 - **Spring Security** (JWT authentication, BCrypt password hashing)
 - **Hibernate / JPA** (ORM)
+- **Spring AMQP** (RabbitMQ klijent, Saga Choreography)
 - **Lombok** (boilerplate redukcija)
 - **Maven Wrapper** (`./mvnw`)
 
