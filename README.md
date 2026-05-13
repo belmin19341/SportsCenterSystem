@@ -22,6 +22,7 @@
 - **Java 17+** — `java -version`
 - **Docker & Docker Compose** — `docker --version && docker compose version`
 - Maven **nije** potreban globalno — koristimo `./mvnw` wrapper unutar svakog servisa
+- **Node.js 20+ i pnpm** — potrebno za novi `frontend/` projekat
 - **`.env` fajl** — kopirajte `.env.example` → `.env` prije pokretanja
 
 ---
@@ -29,6 +30,7 @@
 ## Brzi start (korak po korak)
 
 > **⚠️ Prvo:** Kreirajte `.env` fajl — kopirajte `.env.example` u `.env` prije nego što pokrenete Docker.
+> Za dev reset/fresh start ostavite `JPA_HIBERNATE_DDL_AUTO=update` (to omogucava automatsko kreiranje tabela na praznim bazama).
 
 ### 1. Pokrenuti Docker baze
 
@@ -38,7 +40,7 @@ Iz projekta foldera:
 docker compose up -d
 ```
 
-Ovo pokreće 4 MySQL 8.0 kontejnera. Provjera statusa:
+Ovo pokreće 4 MySQL 8.0 kontejnera i RabbitMQ broker. Provjera statusa:
 
 ```bash
 docker compose ps
@@ -46,22 +48,35 @@ docker compose ps
 
 Sva 4 kontejnera trebaju biti `healthy` (pričekajte ~15 sekundi nakon pokretanja).
 
-### 2. Buildati servise
+### 2. Buildati cijeli projekat
 
-Svaki servis se builda zasebno iz svog foldera:
+**Preporučeno:**
+
+```bash
+bash build-all.sh
+```
+
+Ovo builda:
+- config-server
+- discovery-server
+- API Gateway
+- sva 4 mikroservisa
+- frontend dependencies i frontend production build
+
+**Ako želite ručno, backend servisi se i dalje mogu buildati zasebno:**
 
 ```bash
 # User Service
-cd "User Service" && chmod +x mvnw && ./mvnw clean package -DskipTests && cd ..
+cd "User Service" && sh ./mvnw clean package -DskipTests && cd ..
 
 # Resource Service
-cd "Resource Service" && chmod +x mvnw && ./mvnw clean package -DskipTests && cd ..
+cd "Resource Service" && sh ./mvnw clean package -DskipTests && cd ..
 
 # Booking Service
-cd "Booking Service" && chmod +x mvnw && ./mvnw clean package -DskipTests && cd ..
+cd "Booking Service" && sh ./mvnw clean package -DskipTests && cd ..
 
 # Payment Service
-cd "Payment Service" && chmod +x mvnw && ./mvnw clean package -DskipTests && cd ..
+cd "Payment Service" && sh ./mvnw clean package -DskipTests && cd ..
 ```
 
 ### 3. Pokrenuti servise
@@ -69,15 +84,40 @@ cd "Payment Service" && chmod +x mvnw && ./mvnw clean package -DskipTests && cd 
 **Opcija A — Automatska skripta (PREPORUČENO):**
 
 ```bash
-chmod +x run-services.sh
-./run-services.sh
+bash run-services.sh
 ```
 
 Skripta će:
 1. ✓ Učitati `.env` konfiguraciju
-2. ✓ Provjeriti da li su Docker kontejneri pokrenuti
-3. ✓ Pokrenuti sve 4 servisa u pozadini
-4. ✓ Prikazati sve važne informacije (portovi, kredencijali, logovi)
+2. ✓ Ako nedostaju JAR artefakti, automatski pokrenuti `bash build-all.sh --skip-frontend`
+3. ✓ Pokrenuti Docker infrastrukturu i sačekati da MySQL/RabbitMQ postanu healthy
+4. ✓ Reuse-ati već zdrave servise umjesto da diže duplikate pri ponovnom pokretanju
+5. ✓ Pokrenuti backend servise samo ako nisu već dostupni
+6. ✓ Fail-ati ako obavezni servis ne prođe health-check
+7. ✓ Automatski pokrenuti frontend na `http://localhost:5173`
+8. ✓ Prikazati sve važne informacije (portovi, kredencijali, logovi)
+
+Ako želite zadržati stari backend-only način rada:
+
+```bash
+bash run-services.sh --backend-only
+```
+
+Ako želite **obrisati lokalne Docker baze, ugasiti postojeće procese i ponovo seed-ati podatke**:
+
+```bash
+bash run-services.sh --reseed
+```
+
+`--reseed` će:
+1. ugasiti lokalne procese na frontend/gateway/service portovima
+2. pokrenuti `docker compose down -v`
+3. obrisati lokalne log fajlove iz `/tmp`
+4. rebuildati backend preko `bash build-all.sh --skip-frontend`
+5. ponovo podići cijeli stack bez reuse-anja starih JVM procesa i sa schema recreation startup-om za DB servise
+6. potvrditi da `admin / password123` radi prije nego što prijavi uspjeh
+
+To je najbrži način da vratite seed naloge kao što su `admin / password123` i `john_doe / password123`.
 
 **Opcija B — Ručno (terminal po servis):**
 
@@ -104,6 +144,23 @@ java -jar "User Service/target/user-service-0.0.1-SNAPSHOT.jar" &
 java -jar "Resource Service/target/resource-service-0.0.1-SNAPSHOT.jar" &
 java -jar "Booking Service/target/booking-service-0.0.1-SNAPSHOT.jar" &
 java -jar "Payment Service/target/payment-service-0.0.1-SNAPSHOT.jar" &
+```
+
+### 3.5 Pokrenuti samo frontend
+
+```bash
+bash run-frontend.sh
+```
+
+Skripta će automatski:
+- instalirati frontend dependencies ako `frontend/node_modules` ne postoji
+- pokrenuti Vite dev server na `http://localhost:5173`
+- koristiti `VITE_API_BASE_URL` iz root `.env` fajla (default: `http://localhost:8080`)
+
+Važno:
+- frontend komunicira sa backendom preko **API Gateway-a** na `http://localhost:8080`
+- Gateway CORS sada koristi `FRONTEND_ALLOWED_ORIGINS` iz root `.env` fajla
+- prvi implementirani slice pokriva: public browsing, login, user dashboard i osnovni booking flow
 
 ### 4. Verifikacija
 
@@ -440,4 +497,3 @@ Ako payment padne:  PaymentFailedEvent → Booking(CANCELLED) ← KOMPENZACIJA
 - **Spring AMQP** (RabbitMQ klijent, Saga Choreography)
 - **Lombok** (boilerplate redukcija)
 - **Maven Wrapper** (`./mvnw`)
-

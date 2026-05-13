@@ -28,6 +28,15 @@
 # Logs
 *.log
 
+# Frontend / pnpm
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/.vite/
+frontend/.pnpm-store/
+frontend/playwright-report/
+frontend/test-results/
+
 # Java
 *.class
 *.jar
@@ -39,7 +48,6 @@ hs_err_pid*
 .classpath
 .project
 .settings/
-
 
 
 

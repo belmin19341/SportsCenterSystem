@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +25,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final ModelMapper modelMapper;
     private final JsonPatchUtil jsonPatchUtil;
+    private final PasswordEncoder passwordEncoder;
 
     public List<UserResponseDTO> getAllUsers() {
         return userRepository.findAll().stream()
@@ -60,7 +62,7 @@ public class UserService {
         User user = User.builder()
                 .username(dto.getUsername())
                 .email(dto.getEmail())
-                .passwordHash(dto.getPassword()) // In production, hash the password
+                .passwordHash(passwordEncoder.encode(dto.getPassword()))
                 .role(dto.getRole())
                 .phone(dto.getPhone())
                 .build();
@@ -83,7 +85,7 @@ public class UserService {
 
         user.setUsername(dto.getUsername());
         user.setEmail(dto.getEmail());
-        user.setPasswordHash(dto.getPassword());
+        user.setPasswordHash(passwordEncoder.encode(dto.getPassword()));
         user.setRole(dto.getRole());
         user.setPhone(dto.getPhone());
 
@@ -131,4 +133,3 @@ public class UserService {
         userRepository.deleteById(id);
     }
 }
-
