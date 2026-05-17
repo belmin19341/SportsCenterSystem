@@ -8,6 +8,9 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("test")
 class UserServiceApplicationTests {
 
+    @org.springframework.boot.test.mock.mockito.MockBean
+    private org.springframework.amqp.rabbit.core.RabbitTemplate rabbitTemplate;
+
     @Test
     void contextLoads() {
     }

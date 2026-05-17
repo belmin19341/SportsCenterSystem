@@ -52,6 +52,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         return findConflictingByStatuses(facilityId, start, end,
                 List.of(Booking.BookingStatus.PENDING, Booking.BookingStatus.CONFIRMED));
     }
+
+    List<Booking> findByUserIdAndStatusIn(Long userId, List<Booking.BookingStatus> statuses);
 }
 
 
