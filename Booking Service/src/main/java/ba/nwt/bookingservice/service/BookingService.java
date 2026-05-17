@@ -311,6 +311,7 @@ public class BookingService {
         PaymentView payment;
         try {
             payment = paymentServiceClient.createPayment(PaymentCreateView.builder()
+                    .userId(dto.getUserId())
                     .bookingId(booking.getId())
                     .amount(authoritativePrice)
                     .paymentMethod(paymentMethod == null ? "CREDIT_CARD" : paymentMethod)

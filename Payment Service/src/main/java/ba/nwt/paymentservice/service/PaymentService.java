@@ -1,5 +1,6 @@
 package ba.nwt.paymentservice.service;
 
+import ba.nwt.paymentservice.client.UserServiceClient;
 import ba.nwt.paymentservice.config.JsonPatchUtil;
 import ba.nwt.paymentservice.dto.PaymentRequestDTO;
 import ba.nwt.paymentservice.dto.PaymentResponseDTO;
@@ -33,6 +34,7 @@ public class PaymentService {
     private final NotificationRepository notificationRepository;
     private final ModelMapper modelMapper;
     private final JsonPatchUtil jsonPatchUtil;
+    private final UserServiceClient userServiceClient;
 
     public List<PaymentResponseDTO> getAll() {
         return paymentRepository.findAll().stream()
@@ -76,6 +78,13 @@ public class PaymentService {
 
     @Transactional
     public PaymentResponseDTO create(PaymentRequestDTO dto) {
+        // Synchronous validation: confirm the paying user exists before persisting anything.
+        // User not found (404) → DownstreamBadRequestException → 400
+        // User Service down   → DownstreamUnavailableException → 503
+        if (dto.getUserId() != null) {
+            userServiceClient.getUser(dto.getUserId());
+        }
+
         Payment payment = Payment.builder()
                 .bookingId(dto.getBookingId())
                 .rentalId(dto.getRentalId())

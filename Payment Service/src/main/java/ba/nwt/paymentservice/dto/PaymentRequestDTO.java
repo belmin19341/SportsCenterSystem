@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class PaymentRequestDTO {
 
+    private Long userId;
     private Long bookingId;
     private Long rentalId;
 

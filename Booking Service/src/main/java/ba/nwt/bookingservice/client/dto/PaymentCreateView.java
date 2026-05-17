@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class PaymentCreateView {
+    private Long userId;
     private Long bookingId;
     private Long rentalId;
     private BigDecimal amount;
