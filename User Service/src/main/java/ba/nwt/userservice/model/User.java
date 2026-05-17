@@ -31,13 +31,21 @@ public class User {
     @Column(length = 20)
     private String phone;
 
+    @Enumerated(EnumType.STRING)
+    @Column(columnDefinition = "VARCHAR(20) DEFAULT 'ACTIVE'")
+    private UserStatus status = UserStatus.ACTIVE;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    // ── Enum ──
+    // ── Enums ──
     public enum Role {
         USER, OWNER, ADMIN
+    }
+
+    public enum UserStatus {
+        ACTIVE, DELETION_PENDING, DELETED
     }
 }
 

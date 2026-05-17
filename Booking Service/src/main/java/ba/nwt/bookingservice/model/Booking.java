@@ -47,7 +47,7 @@ public class Booking {
 
     // ── Enum ──
     public enum BookingStatus {
-        PENDING, CONFIRMED, COMPLETED, CANCELLED, TEMPORARY_HOLD
+        PENDING, CONFIRMED, COMPLETED, CANCELLED, TEMPORARY_HOLD, CANCELLATION_PENDING
     }
 }
 
