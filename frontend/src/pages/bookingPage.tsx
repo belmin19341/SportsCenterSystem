@@ -21,24 +21,20 @@ import {
 	createInitialBookingDraft,
 	saveBookingDraft
 } from '@/features/bookings/bookingDraft'
+import {BookingScheduleFields} from '@/features/bookings/bookingScheduleFields'
+import {
+	applyStartTimeToDraft,
+	createMinimumBookingDateTime,
+	getMinimumEndDateTime
+} from '@/features/bookings/bookingScheduleLogic'
 import {
 	formatDuration,
 	formatRateSummary
 } from '@/features/bookings/pricingCopy'
-import {BookingScheduleFields} from '@/features/bookings/bookingScheduleFields'
 import {SelectedFacilitySummary} from '@/features/bookings/selectedFacilitySummary'
-import {
-	getSuggestedEndTime,
-	isValidDateRange
-} from '@/features/bookings/timeRange'
+import {isValidDateRange} from '@/features/bookings/timeRange'
 import {getFacilityPriceQuote, listFacilities} from '@/features/resources/api'
 import {formatCurrency, getErrorMessage} from '@/lib/format'
-import {
-	addLocalDateTimeMinutes,
-	parseLocalDateTime,
-	roundDateUp,
-	toLocalDateTimeValue
-} from '@/lib/localDateTime'
 import {validateBookingForm} from '@/lib/validation'
 
 export function BookingPage() {
@@ -113,13 +109,11 @@ export function BookingPage() {
 			),
 		[facilitiesQuery.data, form.facilityId]
 	)
-	const minimumBookingDateTime = useMemo(
-		() =>
-			toLocalDateTimeValue(roundDateUp(new Date(Date.now() + 5 * 60_000), 15)),
-		[]
+	const minimumBookingDateTime = useMemo(createMinimumBookingDateTime, [])
+	const minimumEndDateTime = getMinimumEndDateTime(
+		form.startTime,
+		minimumBookingDateTime
 	)
-	const minimumEndDateTime =
-		addLocalDateTimeMinutes(form.startTime, 1) || minimumBookingDateTime
 	const bookingValidationErrors = useMemo(
 		() =>
 			validateBookingForm({
@@ -139,28 +133,13 @@ export function BookingPage() {
 	)
 
 	function handleStartTimeChange(nextStartTime: string) {
-		setForm(currentForm => {
-			if (!nextStartTime) {
-				return {...currentForm, endTime: '', startTime: ''}
-			}
-
-			const parsedCurrentEndTime = parseLocalDateTime(currentForm.endTime)
-			const parsedNextStartTime = parseLocalDateTime(nextStartTime)
-			const shouldSuggestEndTime =
-				!(parsedCurrentEndTime && parsedNextStartTime) ||
-				parsedCurrentEndTime.valueOf() <= parsedNextStartTime.valueOf()
-
-			return {
-				...currentForm,
-				endTime: shouldSuggestEndTime
-					? getSuggestedEndTime(
-							nextStartTime,
-							selectedFacility?.workingHoursEnd
-						)
-					: currentForm.endTime,
-				startTime: nextStartTime
-			}
-		})
+		setForm(currentForm =>
+			applyStartTimeToDraft(
+				currentForm,
+				nextStartTime,
+				selectedFacility?.workingHoursEnd
+			)
+		)
 	}
 
 	const bookingMutation = useMutation({

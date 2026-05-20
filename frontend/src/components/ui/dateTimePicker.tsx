@@ -1,5 +1,5 @@
 import {cn} from '@/lib/utils'
-import {type DateTimePickerProps} from './dateTimePicker.shared'
+import type {DateTimePickerProps} from './dateTimePicker.shared'
 import {DateTimePickerCalendar} from './dateTimePickerCalendar'
 import {useDateTimePickerState} from './dateTimePickerState'
 import {DateTimePickerTimePanel} from './dateTimePickerTimePanel'
@@ -88,7 +88,7 @@ export function DateTimePicker({
 					aria-label={
 						mode === 'datetime' ? 'Choose booking date and time' : 'Choose time'
 					}
-					className='absolute left-0 z-20 mt-3 w-full rounded-[1.5rem] border border-slate-800 bg-slate-950/98 p-4 shadow-2xl shadow-slate-950/50 backdrop-blur sm:p-5'
+					className='absolute left-0 z-20 mt-3 w-full rounded-3xl border border-slate-800 bg-slate-950/98 p-4 shadow-2xl shadow-slate-950/50 backdrop-blur sm:p-5'
 					id={panelId}
 					role='dialog'
 				>
