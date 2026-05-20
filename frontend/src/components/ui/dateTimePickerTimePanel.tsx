@@ -85,9 +85,9 @@ export function DateTimePickerTimePanel({
 						}}
 						value={selectedHour ?? ''}
 					>
-						{!canSelectTime ? (
+						{canSelectTime ? null : (
 							<option value=''>Select a date first</option>
-						) : null}
+						)}
 						{availableHours.map(hour => (
 							<option key={hour} value={hour}>
 								{toLocalTimeValue(hour, 0).slice(0, 2)}
@@ -111,9 +111,9 @@ export function DateTimePickerTimePanel({
 						}}
 						value={selectedMinute ?? ''}
 					>
-						{!canSelectTime ? (
+						{canSelectTime ? null : (
 							<option value=''>Select a date first</option>
-						) : null}
+						)}
 						{availableMinutes.map(minute => (
 							<option key={minute} value={minute}>
 								{toLocalTimeValue(0, minute).slice(3, 5)}

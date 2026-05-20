@@ -13,8 +13,8 @@ import {
 	CardHeader,
 	CardTitle
 } from '@/components/ui/card'
-import {Label} from '@/components/ui/label'
 import {createBooking, listConflictingBookings} from '@/features/bookings/api'
+import {BookingBasicsFields} from '@/features/bookings/bookingBasicsFields'
 import {
 	type BookingDraft,
 	clearBookingDraft,
@@ -257,28 +257,23 @@ export function BookingPage() {
 						<LoadingOrError error={facilitiesQuery.error} />
 					) : (
 						<form className='space-y-5 sm:space-y-6' onSubmit={handleSubmit}>
-							<div className='space-y-2'>
-								<Label htmlFor='facilityId'>Facility</Label>
-								<select
-									className='flex h-11 w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400'
-									id='facilityId'
-									onChange={event =>
-										setForm(currentForm => ({
-											...currentForm,
-											facilityId: event.target.value
-										}))
-									}
-									required={true}
-									value={form.facilityId}
-								>
-									<option value=''>Choose a facility</option>
-									{facilitiesQuery.data.map(facility => (
-										<option key={facility.id} value={facility.id}>
-											{facility.name} ({facility.type}, {facility.status})
-										</option>
-									))}
-								</select>
-							</div>
+							<BookingBasicsFields
+								facilities={facilitiesQuery.data}
+								facilityId={form.facilityId}
+								onChangeFacilityId={nextFacilityId =>
+									setForm(currentForm => ({
+										...currentForm,
+										facilityId: nextFacilityId
+									}))
+								}
+								onChangePaymentMethod={nextPaymentMethod =>
+									setForm(currentForm => ({
+										...currentForm,
+										paymentMethod: nextPaymentMethod
+									}))
+								}
+								paymentMethod={form.paymentMethod}
+							/>
 
 							<BookingScheduleFields
 								endTime={form.endTime}
@@ -295,25 +290,6 @@ export function BookingPage() {
 								workingHoursEnd={selectedFacility?.workingHoursEnd}
 								workingHoursStart={selectedFacility?.workingHoursStart}
 							/>
-
-							<div className='space-y-2'>
-								<Label htmlFor='paymentMethod'>Payment method</Label>
-								<select
-									className='flex h-11 w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400'
-									id='paymentMethod'
-									onChange={event =>
-										setForm(currentForm => ({
-											...currentForm,
-											paymentMethod: event.target.value as PaymentMethod
-										}))
-									}
-									value={form.paymentMethod}
-								>
-									<option value='CREDIT_CARD'>Credit card</option>
-									<option value='DEBIT_CARD'>Debit card</option>
-									<option value='PAYPAL'>PayPal</option>
-								</select>
-							</div>
 
 							{!isTimeRangeValid && form.startTime && form.endTime ? (
 								<Alert variant='destructive'>
