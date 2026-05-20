@@ -1,10 +1,7 @@
-import {useMemo} from 'react'
-import {
-	useMutation,
-	useQuery,
-	useQueryClient
-} from '@tanstack/react-query'
+import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
+import {useMemo, useState} from 'react'
 import {useAuth} from '@/auth/authContext'
+import {useFeedback} from '@/components/feedback'
 import {LoadingOrError} from '@/components/loadingOrError'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
@@ -28,7 +25,13 @@ import {
 	listUserNotifications,
 	markNotificationAsRead
 } from '@/features/user/api'
-import {formatCurrency, formatDate, formatDateTime} from '@/lib/format'
+import {
+	formatCurrency,
+	formatDate,
+	formatDateTime,
+	getErrorMessage
+} from '@/lib/format'
+import type {BookingStatus} from '@/types/api'
 
 function getFacilityName(
 	facilityNameById: Map<number, string>,
@@ -39,11 +42,18 @@ function getFacilityName(
 
 export function DashboardPage() {
 	const {session} = useAuth()
+	const {showFeedback} = useFeedback()
 	const queryClient = useQueryClient()
 	const userId = session?.userId ?? 0
+	const [bookingFilter, setBookingFilter] = useState<BookingStatus | 'ALL'>(
+		'ALL'
+	)
+	const [notificationFilter, setNotificationFilter] = useState<
+		'ALL' | 'READ' | 'UNREAD'
+	>('ALL')
 
 	const facilitiesQuery = useQuery({
-		queryFn: listFacilities,
+		queryFn: () => listFacilities(),
 		queryKey: ['facilities']
 	})
 	const userQuery = useQuery({
@@ -77,9 +87,11 @@ export function DashboardPage() {
 		queryKey: ['notifications', userId]
 	})
 	const paymentsQuery = useQuery({
-		enabled: Boolean(session) && Boolean(bookingsQuery.data?.length),
+		enabled: Boolean(session) && (bookingsQuery.data?.length ?? 0) > 0,
 		queryFn: () =>
-			listPaymentsForBookings((bookingsQuery.data || []).map(booking => booking.id)),
+			listPaymentsForBookings(
+				(bookingsQuery.data || []).map(booking => booking.id)
+			),
 		queryKey: [
 			'payments',
 			userId,
@@ -88,8 +100,21 @@ export function DashboardPage() {
 	})
 
 	const markReadMutation = useMutation({
-		mutationFn: (notificationId: number) => markNotificationAsRead(notificationId),
+		mutationFn: (notificationId: number) =>
+			markNotificationAsRead(notificationId),
+		onError(error) {
+			showFeedback({
+				description: getErrorMessage(error),
+				title: 'Notification update failed',
+				variant: 'destructive'
+			})
+		},
 		onSuccess() {
+			showFeedback({
+				description: 'The notification was marked as read.',
+				title: 'Notification updated',
+				variant: 'success'
+			})
 			return queryClient.invalidateQueries({
 				queryKey: ['notifications', userId]
 			})
@@ -98,8 +123,35 @@ export function DashboardPage() {
 
 	const facilityNameById = useMemo(
 		() =>
-			new Map((facilitiesQuery.data || []).map(facility => [facility.id, facility.name])),
+			new Map(
+				(facilitiesQuery.data || []).map(facility => [
+					facility.id,
+					facility.name
+				])
+			),
 		[facilitiesQuery.data]
+	)
+	const visibleBookings = useMemo(
+		() =>
+			(bookingsQuery.data || []).filter(
+				booking => bookingFilter === 'ALL' || booking.status === bookingFilter
+			),
+		[bookingFilter, bookingsQuery.data]
+	)
+	const visibleNotifications = useMemo(
+		() =>
+			(notificationsQuery.data || []).filter(notification => {
+				if (notificationFilter === 'READ') {
+					return notification.isRead
+				}
+
+				if (notificationFilter === 'UNREAD') {
+					return !notification.isRead
+				}
+
+				return true
+			}),
+		[notificationFilter, notificationsQuery.data]
 	)
 
 	if (!session) {
@@ -182,23 +234,39 @@ export function DashboardPage() {
 			<section className='grid gap-6 xl:grid-cols-[1.3fr,0.7fr]'>
 				<Card>
 					<CardHeader>
-						<CardTitle>Bookings</CardTitle>
-						<CardDescription>
-							Live booking history from Booking Service.
-						</CardDescription>
+						<div className='flex flex-wrap items-start justify-between gap-4'>
+							<div>
+								<CardTitle>Bookings</CardTitle>
+								<CardDescription>Your booking history.</CardDescription>
+							</div>
+							<select
+								aria-label='Filter bookings by status'
+								className='h-10 rounded-md border border-slate-800 bg-slate-950 px-3 text-sm text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400'
+								onChange={event =>
+									setBookingFilter(event.target.value as BookingStatus | 'ALL')
+								}
+								value={bookingFilter}
+							>
+								<option value='ALL'>All statuses</option>
+								<option value='PENDING'>Pending</option>
+								<option value='CONFIRMED'>Confirmed</option>
+								<option value='COMPLETED'>Completed</option>
+								<option value='CANCELLED'>Cancelled</option>
+							</select>
+						</div>
 					</CardHeader>
 					<CardContent>
 						{bookingsQuery.isPending ? (
 							<LoadingOrError title='Loading bookings' />
 						) : bookingsQuery.isError ? (
 							<LoadingOrError error={bookingsQuery.error} />
-						) : bookingsQuery.data.length === 0 ? (
+						) : visibleBookings.length === 0 ? (
 							<div className='text-sm text-slate-400'>
-								You do not have any bookings yet.
+								No bookings match the selected filter.
 							</div>
 						) : (
 							<div className='space-y-4'>
-								{bookingsQuery.data.map(booking => (
+								{visibleBookings.map(booking => (
 									<div
 										className='rounded-xl border border-slate-800 bg-slate-900/50 p-4'
 										key={booking.id}
@@ -206,7 +274,10 @@ export function DashboardPage() {
 										<div className='flex flex-wrap items-center justify-between gap-3'>
 											<div>
 												<div className='font-medium text-white'>
-													{getFacilityName(facilityNameById, booking.facilityId)}
+													{getFacilityName(
+														facilityNameById,
+														booking.facilityId
+													)}
 												</div>
 												<div className='text-sm text-slate-400'>
 													{formatDateTime(booking.startTime)} -{' '}
@@ -228,7 +299,9 @@ export function DashboardPage() {
 				<Card>
 					<CardHeader>
 						<CardTitle>Achievements</CardTitle>
-						<CardDescription>Badges currently assigned to the user.</CardDescription>
+						<CardDescription>
+							Badges currently assigned to the user.
+						</CardDescription>
 					</CardHeader>
 					<CardContent>
 						{achievementsQuery.isPending ? (
@@ -282,7 +355,8 @@ export function DashboardPage() {
 										</div>
 										<div className='mt-2 flex items-center justify-between'>
 											<span>
-												{formatDate(rental.startDate)} - {formatDate(rental.endDate)}
+												{formatDate(rental.startDate)} -{' '}
+												{formatDate(rental.endDate)}
 											</span>
 											<span>{formatCurrency(rental.totalPrice)}</span>
 										</div>
@@ -302,12 +376,18 @@ export function DashboardPage() {
 						</CardDescription>
 					</CardHeader>
 					<CardContent>
-						{paymentsQuery.isPending ? (
+						{!bookingsQuery.data || bookingsQuery.data.length === 0 ? (
+							<div className='text-sm text-slate-400'>
+								No payment records yet.
+							</div>
+						) : paymentsQuery.isPending ? (
 							<LoadingOrError title='Loading payments' />
 						) : paymentsQuery.isError ? (
 							<LoadingOrError error={paymentsQuery.error} />
 						) : !paymentsQuery.data || paymentsQuery.data.length === 0 ? (
-							<div className='text-sm text-slate-400'>No payment records yet.</div>
+							<div className='text-sm text-slate-400'>
+								No payment records yet.
+							</div>
 						) : (
 							<div className='space-y-3'>
 								{paymentsQuery.data.map(payment => (
@@ -334,23 +414,39 @@ export function DashboardPage() {
 			<section>
 				<Card>
 					<CardHeader>
-						<CardTitle>Notifications</CardTitle>
-						<CardDescription>
-							Recent user notifications with read-state actions.
-						</CardDescription>
+						<div className='flex flex-wrap items-start justify-between gap-4'>
+							<div>
+								<CardTitle>Notifications</CardTitle>
+								<CardDescription>Recent account updates.</CardDescription>
+							</div>
+							<select
+								aria-label='Filter notifications'
+								className='h-10 rounded-md border border-slate-800 bg-slate-950 px-3 text-sm text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400'
+								onChange={event =>
+									setNotificationFilter(
+										event.target.value as 'ALL' | 'READ' | 'UNREAD'
+									)
+								}
+								value={notificationFilter}
+							>
+								<option value='ALL'>All</option>
+								<option value='UNREAD'>Unread</option>
+								<option value='READ'>Read</option>
+							</select>
+						</div>
 					</CardHeader>
 					<CardContent>
 						{notificationsQuery.isPending ? (
 							<LoadingOrError title='Loading notifications' />
 						) : notificationsQuery.isError ? (
 							<LoadingOrError error={notificationsQuery.error} />
-						) : notificationsQuery.data.length === 0 ? (
+						) : visibleNotifications.length === 0 ? (
 							<div className='text-sm text-slate-400'>
-								You do not have any notifications.
+								No notifications match the selected filter.
 							</div>
 						) : (
 							<div className='space-y-3'>
-								{notificationsQuery.data.slice(0, 6).map(notification => (
+								{visibleNotifications.slice(0, 6).map(notification => (
 									<div
 										className='rounded-xl border border-slate-800 bg-slate-900/50 p-4'
 										key={notification.id}
@@ -377,7 +473,7 @@ export function DashboardPage() {
 													<Button
 														disabled={markReadMutation.isPending}
 														onClick={() => {
-															void markReadMutation.mutateAsync(notification.id)
+															markReadMutation.mutate(notification.id)
 														}}
 														size='sm'
 														variant='outline'

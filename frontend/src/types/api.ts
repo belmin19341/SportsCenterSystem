@@ -15,6 +15,37 @@ export type FacilityType =
 	| 'TABLE_TENNIS'
 
 export type PaymentMethod = 'CREDIT_CARD' | 'DEBIT_CARD' | 'PAYPAL'
+export type PaymentStatus = 'FAILED' | 'PAID' | 'PENDING' | 'REFUNDED'
+export type EquipmentType =
+	| 'RACKET'
+	| 'BALL'
+	| 'FITNESS'
+	| 'SKI'
+	| 'BICYCLE'
+	| 'OTHER'
+export type EquipmentCondition = 'NEW' | 'GOOD' | 'FAIR' | 'POOR'
+export type ReviewedEntityType = 'FACILITY' | 'EQUIPMENT'
+export type DayOfWeekName =
+	| 'FRIDAY'
+	| 'HOLIDAY'
+	| 'MONDAY'
+	| 'SATURDAY'
+	| 'SUNDAY'
+	| 'THURSDAY'
+	| 'TUESDAY'
+	| 'WEDNESDAY'
+
+export interface PageResponse<T> {
+	content: T[]
+	empty: boolean
+	first: boolean
+	last: boolean
+	number: number
+	numberOfElements: number
+	size: number
+	totalElements: number
+	totalPages: number
+}
 
 export interface AuthResponse {
 	access_token: string
@@ -62,6 +93,19 @@ export interface FacilityResponse {
 	workingHoursStart: string
 }
 
+export interface FacilityRequest {
+	basePricePerHour: number
+	capacity: number
+	description: string | null
+	imageUrl: string | null
+	name: string
+	ownerId: number
+	status: FacilityStatus
+	type: FacilityType
+	workingHoursEnd: string
+	workingHoursStart: string
+}
+
 export interface EquipmentResponse {
 	category: string
 	createdAt: string
@@ -76,7 +120,18 @@ export interface EquipmentResponse {
 	quantityAvailable: number
 	quantityTotal: number
 	rentalCount: number
-	type: 'RACKET' | 'BALL' | 'FITNESS' | 'SKI' | 'BICYCLE' | 'OTHER'
+	type: EquipmentType
+}
+
+export interface PricingRuleResponse {
+	dayOfWeek: DayOfWeekName | null
+	description: string | null
+	facilityId: number
+	facilityName: string
+	id: number
+	priceMultiplier: number
+	timeSlotEnd: string
+	timeSlotStart: string
 }
 
 export interface PriceQuote {
@@ -157,6 +212,18 @@ export interface EquipmentRentalResponse {
 	userId: number
 }
 
+export interface EquipmentRentalRequest {
+	bookingId: number | null
+	depositPaid: number
+	endDate: string
+	equipmentId: number
+	quantity: number
+	startDate: string
+	status: string
+	totalPrice: number
+	userId: number
+}
+
 export interface PaymentResponse {
 	amount: number
 	bookingId: number | null
@@ -166,7 +233,7 @@ export interface PaymentResponse {
 	paidAt: string | null
 	paymentMethod: PaymentMethod
 	rentalId: number | null
-	status: string
+	status: PaymentStatus | string
 	transactionId: string
 }
 
@@ -180,3 +247,20 @@ export interface NotificationResponse {
 	userId: number
 }
 
+export interface ReviewRequest {
+	comment: string | null
+	rating: number
+	reviewedEntityId: number
+	reviewedEntityType: ReviewedEntityType
+	reviewerId: number
+}
+
+export interface ReviewResponse {
+	comment: string | null
+	createdAt: string
+	id: number
+	rating: number
+	reviewedEntityId: number
+	reviewedEntityType: ReviewedEntityType
+	reviewerId: number
+}

@@ -1,23 +1,90 @@
 import {App} from '@/App'
-import {render, screen} from '@/test-utils'
+import {fireEvent, render, screen, waitFor} from '@/test-utils'
 
 it('renders the public discovery view with live sections', async () => {
 	render(<App />, {route: '/'})
 
 	await expect(
 		screen.findByRole('heading', {
-			name: /find courts, understand pricing, and move into authenticated booking flows/i
+			name: /find courts, compare availability signals, and reserve your next slot/iu
 		})
 	).resolves.toBeInTheDocument()
 
-	await expect(screen.findByText('Padel Arena Alpha')).resolves.toBeInTheDocument()
-	await expect(screen.findByText('Carbon Racket Set')).resolves.toBeInTheDocument()
+	await expect(
+		screen.findByRole('heading', {name: 'Padel Arena Alpha'})
+	).resolves.toBeInTheDocument()
+	await expect(
+		screen.findByText('Carbon Racket Set')
+	).resolves.toBeInTheDocument()
 })
 
 it('redirects protected routes to login when there is no session', async () => {
 	render(<App />, {route: '/dashboard'})
 
 	await expect(
-		screen.findByRole('heading', {name: /sign in to continue/i})
+		screen.findByRole('heading', {name: /sign in to continue/iu})
+	).resolves.toBeInTheDocument()
+})
+
+it('validates login before calling the backend', async () => {
+	const {user} = render(<App />, {route: '/login'})
+
+	await user.type(screen.getByLabelText(/username/iu), 'ab')
+	await user.type(screen.getByLabelText(/password/iu), '123')
+	await user.click(screen.getByRole('button', {name: /sign in/iu}))
+
+	expect(
+		await screen.findByText(/username must be between 3 and 100 characters/iu)
+	).toBeInTheDocument()
+})
+
+it('logs in and loads secured dashboard data', async () => {
+	const {user} = render(<App />, {route: '/login'})
+
+	await user.type(screen.getByLabelText(/username/iu), 'john_doe')
+	await user.type(screen.getByLabelText(/password/iu), 'password123')
+	await user.click(screen.getByRole('button', {name: /sign in/iu}))
+
+	await expect(screen.findByText('john_doe')).resolves.toBeInTheDocument()
+	await expect(screen.findByText('SILVER')).resolves.toBeInTheDocument()
+})
+
+it('creates a booking only after quote and conflict checks pass', async () => {
+	localStorage.setItem(
+		'sportscenter-session',
+		JSON.stringify({
+			accessToken: 'access-token',
+			accessTokenExpiresAt: Date.now() + 60_000,
+			email: 'john@example.com',
+			refreshToken: 'refresh-token',
+			refreshTokenExpiresAt: Date.now() + 600_000,
+			role: 'USER',
+			tokenType: 'Bearer',
+			userId: 1,
+			username: 'john_doe'
+		})
+	)
+	render(<App />, {route: '/bookings/new?facilityId=1'})
+
+	await screen.findByRole('heading', {name: /create a booking/iu})
+	fireEvent.change(await screen.findByLabelText(/start time/iu), {
+		target: {value: '2099-05-21T10:00'}
+	})
+	fireEvent.change(screen.getByLabelText(/end time/iu), {
+		target: {value: '2099-05-21T11:00'}
+	})
+
+	await expect(
+		screen.findByText(/selected time is available/iu)
+	).resolves.toBeInTheDocument()
+	await expect(screen.findByText(/quoted total/iu)).resolves.toBeInTheDocument()
+
+	await waitFor(() => {
+		expect(screen.getByRole('button', {name: /book now/iu})).toBeEnabled()
+	})
+	fireEvent.click(screen.getByRole('button', {name: /book now/iu}))
+
+	await expect(
+		screen.findByText(/booking created/iu)
 	).resolves.toBeInTheDocument()
 })

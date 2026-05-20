@@ -1,6 +1,7 @@
 import {type FormEvent, useState} from 'react'
 import {Navigate, useLocation, useNavigate} from 'react-router'
 import {useAuth} from '@/auth/authContext'
+import {useFeedback} from '@/components/feedback'
 import {Alert} from '@/components/ui/alert'
 import {Button} from '@/components/ui/button'
 import {
@@ -13,9 +14,11 @@ import {
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {getErrorMessage} from '@/lib/format'
+import {validateLoginForm} from '@/lib/validation'
 
 export function LoginPage() {
 	const {isSignedIn, login} = useAuth()
+	const {showFeedback} = useFeedback()
 	const location = useLocation()
 	const navigate = useNavigate()
 	const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -34,10 +37,22 @@ export function LoginPage() {
 	async function handleSubmit(event: FormEvent<HTMLFormElement>) {
 		event.preventDefault()
 		setErrorMessage(null)
+
+		const validationErrors = validateLoginForm({password, username})
+		if (validationErrors.length > 0) {
+			setErrorMessage(validationErrors.join(' '))
+			return
+		}
+
 		setIsSubmitting(true)
 
 		try {
 			await login({password, username})
+			showFeedback({
+				description: 'Your dashboard data is loading from the secured API.',
+				title: 'Signed in',
+				variant: 'success'
+			})
 			navigate(redirectPath, {replace: true})
 		} catch (error) {
 			setErrorMessage(getErrorMessage(error))
@@ -51,9 +66,7 @@ export function LoginPage() {
 			<Card>
 				<CardHeader>
 					<CardTitle>Sign in to continue</CardTitle>
-					<CardDescription>
-						Authentication goes through the existing gateway-backed JWT flow.
-					</CardDescription>
+					<CardDescription>Use your SportsCenter account.</CardDescription>
 				</CardHeader>
 				<CardContent>
 					<form className='space-y-5' onSubmit={handleSubmit}>
@@ -82,15 +95,21 @@ export function LoginPage() {
 							/>
 						</div>
 
-						{errorMessage ? <Alert variant='destructive'>{errorMessage}</Alert> : null}
+						{errorMessage ? (
+							<Alert variant='destructive'>{errorMessage}</Alert>
+						) : null}
 
-						<Button className='w-full' disabled={isSubmitting} size='lg' type='submit'>
+						<Button
+							className='w-full'
+							disabled={isSubmitting}
+							size='lg'
+							type='submit'
+						>
 							{isSubmitting ? 'Signing in...' : 'Sign in'}
 						</Button>
 
 						<p className='text-sm text-slate-400'>
-							Use a seeded account from the backend if the stack is already
-							running locally.
+							Seed account: john_doe / password123
 						</p>
 					</form>
 				</CardContent>

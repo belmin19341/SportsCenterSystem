@@ -50,7 +50,7 @@ export function createStoredSession(
 		response.refresh_token || previousSession?.refreshToken || ''
 	const refreshTokenExpiresAt = response.refresh_expires_in
 		? now + response.refresh_expires_in * 1000
-		: previousSession?.refreshTokenExpiresAt ?? null
+		: (previousSession?.refreshTokenExpiresAt ?? null)
 
 	return {
 		accessToken: response.access_token,
@@ -82,4 +82,3 @@ export function clearStoredSession() {
 	window.localStorage.removeItem(SESSION_STORAGE_KEY)
 	emitSessionUpdate(null)
 }
-

@@ -25,7 +25,10 @@ export function CardTitle({
 	...props
 }: HTMLAttributes<HTMLHeadingElement>) {
 	return (
-		<h2 className={cn('text-lg font-semibold text-slate-50', className)} {...props} />
+		<h2
+			className={cn('text-lg font-semibold text-slate-50', className)}
+			{...props}
+		/>
 	)
 }
 
@@ -47,6 +50,10 @@ export function CardFooter({
 	className,
 	...props
 }: HTMLAttributes<HTMLDivElement>) {
-	return <div className={cn('flex items-center gap-3 p-6 pt-0', className)} {...props} />
+	return (
+		<div
+			className={cn('flex items-center gap-3 p-6 pt-0', className)}
+			{...props}
+		/>
+	)
 }
-

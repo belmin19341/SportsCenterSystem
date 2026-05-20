@@ -8,10 +8,9 @@ import {
 import type {ApiErrorPayload, AuthResponse, StoredSession} from '@/types/api'
 
 const DEFAULT_API_BASE_URL = 'http://localhost:8080'
-const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(
-	/\/$/,
-	''
-)
+const apiBaseUrl = (
+	import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL
+).replace(/\/$/u, '')
 
 export class ApiError extends Error {
 	details?: string[]
@@ -66,7 +65,7 @@ function createHeaders(headers?: HeadersInit) {
 
 function getBody(body: RequestJsonOptions['body'], headers: Headers) {
 	if (body === undefined) {
-		return undefined
+		return
 	}
 
 	if (isBodyInit(body)) {
@@ -156,7 +155,10 @@ async function getAuthorizedSession() {
 		return session
 	}
 
-	if (!session.refreshToken || isTimestampExpired(session.refreshTokenExpiresAt)) {
+	if (
+		!session.refreshToken ||
+		isTimestampExpired(session.refreshTokenExpiresAt)
+	) {
 		clearStoredSession()
 		return null
 	}
@@ -195,7 +197,10 @@ export async function requestJson<T>(
 	) {
 		try {
 			session = await refreshSessionWithToken(session.refreshToken, session)
-			headers.set('Authorization', `${session.tokenType} ${session.accessToken}`)
+			headers.set(
+				'Authorization',
+				`${session.tokenType} ${session.accessToken}`
+			)
 			response = await fetch(buildApiUrl(path), {
 				body: getBody(options.body, headers),
 				headers,
@@ -208,4 +213,3 @@ export async function requestJson<T>(
 
 	return parseResponse<T>(response)
 }
-

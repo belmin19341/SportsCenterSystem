@@ -1,6 +1,8 @@
 import {useState} from 'react'
 import {Link, NavLink} from 'react-router'
 import {useAuth} from '@/auth/authContext'
+import {canManageFacilities} from '@/auth/roles'
+import {useFeedback} from '@/components/feedback'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {cn} from '@/lib/utils'
@@ -13,12 +15,18 @@ const navLinkClassName = ({isActive}: {isActive: boolean}) =>
 
 export function AppHeader() {
 	const {isSignedIn, logout, session} = useAuth()
+	const {showFeedback} = useFeedback()
 	const [isLoggingOut, setIsLoggingOut] = useState(false)
 
 	async function handleLogout() {
 		setIsLoggingOut(true)
 		try {
 			await logout()
+			showFeedback({
+				description: 'Your local session was cleared.',
+				title: 'Signed out',
+				variant: 'success'
+			})
 		} finally {
 			setIsLoggingOut(false)
 		}
@@ -46,6 +54,11 @@ export function AppHeader() {
 							<NavLink className={navLinkClassName} to='/bookings/new'>
 								New booking
 							</NavLink>
+							{session && canManageFacilities(session.role) ? (
+								<NavLink className={navLinkClassName} to='/owner/facilities'>
+									Facilities
+								</NavLink>
+							) : null}
 						</>
 					) : (
 						<NavLink className={navLinkClassName} to='/login'>
@@ -58,7 +71,9 @@ export function AppHeader() {
 					{session ? (
 						<>
 							<div className='hidden text-right sm:block'>
-								<div className='text-sm font-medium text-white'>{session.username}</div>
+								<div className='text-sm font-medium text-white'>
+									{session.username}
+								</div>
 								<div className='text-xs text-slate-400'>{session.email}</div>
 							</div>
 							<Badge>{session.role}</Badge>
@@ -81,4 +96,3 @@ export function AppHeader() {
 		</header>
 	)
 }
-

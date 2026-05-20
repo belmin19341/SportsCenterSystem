@@ -1,4 +1,5 @@
 import {useQuery} from '@tanstack/react-query'
+import {useState} from 'react'
 import {Link} from 'react-router'
 import {useAuth} from '@/auth/authContext'
 import {LoadingOrError} from '@/components/loadingOrError'
@@ -13,41 +14,58 @@ import {
 } from '@/components/ui/card'
 import {listEquipment, listFacilities} from '@/features/resources/api'
 import {formatCurrency} from '@/lib/format'
+import type {FacilityStatus, FacilityType} from '@/types/api'
 
 function humanizeLabel(value: string) {
 	return value.replaceAll('_', ' ').toLowerCase()
 }
 
+const facilityTypes = [
+	'FOOTBALL_5V5',
+	'FOOTBALL_7V7',
+	'PADEL',
+	'TENNIS',
+	'TABLE_TENNIS'
+] satisfies FacilityType[]
+
+const facilityStatuses = [
+	'ACTIVE',
+	'INACTIVE',
+	'MAINTENANCE'
+] satisfies FacilityStatus[]
+
 export function HomePage() {
 	const {isSignedIn} = useAuth()
+	const [filters, setFilters] = useState<{
+		q: string
+		status: FacilityStatus | ''
+		type: FacilityType | ''
+	}>({q: '', status: 'ACTIVE', type: ''})
 	const facilitiesQuery = useQuery({
-		queryFn: listFacilities,
-		queryKey: ['facilities']
+		queryFn: () => listFacilities(filters),
+		queryKey: ['facilities', filters]
 	})
 	const equipmentQuery = useQuery({
 		queryFn: listEquipment,
 		queryKey: ['equipment']
 	})
 
-	const facilities =
-		facilitiesQuery.data?.filter(facility => facility.status === 'ACTIVE').slice(0, 6) ||
-		[]
+	const facilities = facilitiesQuery.data || []
 	const equipment = equipmentQuery.data?.slice(0, 6) || []
 
 	return (
 		<div className='space-y-10'>
 			<section className='grid gap-6 lg:grid-cols-[1.4fr,0.6fr]'>
-				<Card className='overflow-hidden border-sky-500/20 bg-gradient-to-br from-sky-500/10 via-slate-950 to-slate-950'>
+				<Card className='overflow-hidden border-sky-500/20 bg-slate-950'>
 					<CardHeader className='space-y-4'>
-						<Badge>Public browsing + USER MVP</Badge>
+						<Badge>Sports center booking</Badge>
 						<CardTitle className='max-w-2xl text-4xl leading-tight sm:text-5xl'>
-							Find courts, understand pricing, and move into authenticated
-							booking flows through the API Gateway.
+							Find courts, compare availability signals, and reserve your next
+							slot.
 						</CardTitle>
 						<CardDescription className='max-w-2xl text-base text-slate-300'>
-							This frontend is now anchored in the repository and talks to the
-							existing Spring microservices through the gateway instead of
-							coding around them.
+							Browse active facilities and equipment, then sign in when you are
+							ready to book.
 						</CardDescription>
 					</CardHeader>
 					<CardContent className='flex flex-wrap gap-3'>
@@ -66,19 +84,81 @@ export function HomePage() {
 
 				<Card>
 					<CardHeader>
-						<CardTitle>What is already wired</CardTitle>
-						<CardDescription>
-							This first implementation slice is aligned to the real backend.
-						</CardDescription>
+						<CardTitle>Quick filters</CardTitle>
+						<CardDescription>Refine the facility list.</CardDescription>
 					</CardHeader>
-					<CardContent>
-						<ul className='space-y-3 text-sm text-slate-300'>
-							<li>Gateway-based auth and browser entrypoint</li>
-							<li>Public facility and equipment discovery</li>
-							<li>User session handling with access + refresh tokens</li>
-							<li>Booking creation through the orchestrated booking endpoint</li>
-							<li>User dashboard with loyalty, bookings, rentals, and alerts</li>
-						</ul>
+					<CardContent className='space-y-4'>
+						<div className='space-y-2'>
+							<label
+								className='text-sm font-medium text-slate-200'
+								htmlFor='facilitySearch'
+							>
+								Search
+							</label>
+							<input
+								className='flex h-11 w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400'
+								id='facilitySearch'
+								onChange={event =>
+									setFilters(current => ({...current, q: event.target.value}))
+								}
+								placeholder='Padel, tennis, football...'
+								value={filters.q}
+							/>
+						</div>
+						<div className='grid gap-3 sm:grid-cols-2'>
+							<div className='space-y-2'>
+								<label
+									className='text-sm font-medium text-slate-200'
+									htmlFor='facilityType'
+								>
+									Type
+								</label>
+								<select
+									className='flex h-11 w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400'
+									id='facilityType'
+									onChange={event =>
+										setFilters(current => ({
+											...current,
+											type: event.target.value as FacilityType | ''
+										}))
+									}
+									value={filters.type}
+								>
+									<option value=''>All types</option>
+									{facilityTypes.map(type => (
+										<option key={type} value={type}>
+											{humanizeLabel(type)}
+										</option>
+									))}
+								</select>
+							</div>
+							<div className='space-y-2'>
+								<label
+									className='text-sm font-medium text-slate-200'
+									htmlFor='facilityStatus'
+								>
+									Status
+								</label>
+								<select
+									className='flex h-11 w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400'
+									id='facilityStatus'
+									onChange={event =>
+										setFilters(current => ({
+											...current,
+											status: event.target.value as FacilityStatus | ''
+										}))
+									}
+									value={filters.status}
+								>
+									<option value=''>All statuses</option>
+									{facilityStatuses.map(status => (
+										<option key={status} value={status}>
+											{humanizeLabel(status)}
+										</option>
+									))}
+								</select>
+							</div>
+						</div>
 					</CardContent>
 				</Card>
 			</section>
@@ -90,7 +170,7 @@ export function HomePage() {
 							Featured facilities
 						</h2>
 						<p className='text-sm text-slate-400'>
-							Live data from Resource Service through the gateway.
+							{facilities.length} courts found
 						</p>
 					</div>
 				</div>
@@ -99,6 +179,12 @@ export function HomePage() {
 					<LoadingOrError title='Loading facilities' />
 				) : facilitiesQuery.isError ? (
 					<LoadingOrError error={facilitiesQuery.error} />
+				) : facilities.length === 0 ? (
+					<Card>
+						<CardContent className='pt-6 text-sm text-slate-400'>
+							No facilities match the selected filters.
+						</CardContent>
+					</Card>
 				) : (
 					<div className='grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
 						{facilities.map(facility => (
@@ -126,6 +212,24 @@ export function HomePage() {
 											{facility.workingHoursStart} - {facility.workingHoursEnd}
 										</span>
 									</div>
+									<div className='flex flex-wrap gap-2 pt-2'>
+										<Link to={`/facilities/${facility.id}`}>
+											<Button size='sm' type='button' variant='outline'>
+												Details
+											</Button>
+										</Link>
+										<Link
+											to={
+												isSignedIn
+													? `/bookings/new?facilityId=${facility.id}`
+													: '/login'
+											}
+										>
+											<Button size='sm' type='button'>
+												Book
+											</Button>
+										</Link>
+									</div>
 								</CardContent>
 							</Card>
 						))}
@@ -138,9 +242,7 @@ export function HomePage() {
 					<h2 className='text-2xl font-semibold text-white'>
 						Equipment snapshot
 					</h2>
-					<p className='text-sm text-slate-400'>
-						A lightweight public slice from Resource Service inventory.
-					</p>
+					<p className='text-sm text-slate-400'>Available rental inventory</p>
 				</div>
 
 				{equipmentQuery.isPending ? (
@@ -185,4 +287,3 @@ export function HomePage() {
 		</div>
 	)
 }
-

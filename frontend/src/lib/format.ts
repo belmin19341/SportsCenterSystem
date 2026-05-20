@@ -47,10 +47,30 @@ export function formatDate(value: string | null | undefined) {
 }
 
 export function getErrorMessage(error: unknown) {
-	if (error instanceof Error) {
-		return error.message
-	}
-
-	return 'Something went wrong.'
+	return getErrorMessages(error)[0] || 'Something went wrong.'
 }
 
+export function getErrorMessages(error: unknown) {
+	if (error instanceof Error) {
+		const details = 'details' in error ? error.details : undefined
+		if (Array.isArray(details) && details.length > 0) {
+			return [error.message, ...details]
+		}
+
+		if ('status' in error && error.status === 401) {
+			return ['Your session is no longer valid. Sign in again to continue.']
+		}
+
+		if ('status' in error && error.status === 403) {
+			return ['You do not have permission to perform this action.']
+		}
+
+		if ('status' in error && error.status === 429) {
+			return ['Too many attempts. Wait a moment and try again.']
+		}
+
+		return [error.message]
+	}
+
+	return ['Something went wrong.']
+}

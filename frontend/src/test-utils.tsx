@@ -2,7 +2,7 @@ import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {type RenderOptions, render as rtlRender} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type {PropsWithChildren, ReactElement} from 'react'
-import {BrowserRouter} from 'react-router'
+import {MemoryRouter} from 'react-router'
 
 export const queryClient = new QueryClient({
 	defaultOptions: {
@@ -16,14 +16,16 @@ export function render(
 		reactStrictMode: true
 	}
 ) {
-	globalThis.history.pushState({}, '', route || '/')
+	const initialRoute = route || '/'
 
 	return {
 		user: userEvent.setup(),
 		...rtlRender(ui, {
 			wrapper: ({children}: PropsWithChildren) => (
 				<QueryClientProvider client={queryClient}>
-					<BrowserRouter>{children}</BrowserRouter>
+					<MemoryRouter initialEntries={[initialRoute]}>
+						{children}
+					</MemoryRouter>
 				</QueryClientProvider>
 			),
 			...options
@@ -31,4 +33,4 @@ export function render(
 	}
 }
 
-export * from '@testing-library/react'
+export {fireEvent, screen, waitFor, within} from '@testing-library/react'
