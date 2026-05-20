@@ -43,7 +43,7 @@ textarea {
 	font: inherit;
 }
 
-[data-wrap="anywhere"] {
+.ssc-text-wrap {
 	overflow-wrap: anywhere;
 }
 

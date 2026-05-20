@@ -20,6 +20,7 @@ import {
 	listReviewsForEntity,
 	listUserBookings
 } from '@/features/bookings/api'
+import {formatPriceAdjustment} from '@/features/bookings/pricingCopy'
 import {
 	getFacility,
 	listEquipmentByFacility,
@@ -268,7 +269,7 @@ export function FacilityPage() {
 					<CardHeader>
 						<CardTitle>Pricing rules</CardTitle>
 						<CardDescription>
-							Multipliers applied to base hourly pricing.
+							Time-based changes to the base hourly price.
 						</CardDescription>
 					</CardHeader>
 					<CardContent>
@@ -287,7 +288,9 @@ export function FacilityPage() {
 									>
 										<div className='flex flex-wrap items-center justify-between gap-3'>
 											<span>{rule.dayOfWeek || 'Every day'}</span>
-											<Badge>{rule.priceMultiplier}x</Badge>
+											<Badge>
+												{formatPriceAdjustment(rule.priceMultiplier)}
+											</Badge>
 										</div>
 										<div className='mt-2 text-slate-400'>
 											{rule.timeSlotStart} - {rule.timeSlotEnd}

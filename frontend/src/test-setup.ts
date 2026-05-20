@@ -5,6 +5,7 @@ import {queryClient} from '@/test-utils'
 beforeAll(() => server.listen())
 afterEach(() => {
 	localStorage.clear()
+	sessionStorage.clear()
 	queryClient.clear()
 	server.resetHandlers()
 })

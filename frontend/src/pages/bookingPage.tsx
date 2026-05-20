@@ -1,6 +1,6 @@
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {type FormEvent, useMemo, useState} from 'react'
-import {Link, useNavigate, useSearchParams} from 'react-router'
+import {type FormEvent, useEffect, useMemo, useState} from 'react'
+import {useNavigate, useSearchParams} from 'react-router'
 import {useAuth} from '@/auth/authContext'
 import {useFeedback} from '@/components/feedback'
 import {LoadingOrError} from '@/components/loadingOrError'
@@ -16,40 +16,51 @@ import {
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {createBooking, listConflictingBookings} from '@/features/bookings/api'
+import {
+	type BookingDraft,
+	clearBookingDraft,
+	createInitialBookingDraft,
+	saveBookingDraft
+} from '@/features/bookings/bookingDraft'
+import {
+	formatDuration,
+	formatRateSummary
+} from '@/features/bookings/pricingCopy'
+import {SelectedFacilitySummary} from '@/features/bookings/selectedFacilitySummary'
+import {isValidDateRange} from '@/features/bookings/timeRange'
 import {getFacilityPriceQuote, listFacilities} from '@/features/resources/api'
 import {formatCurrency, getErrorMessage} from '@/lib/format'
 import {validateBookingForm} from '@/lib/validation'
 import type {PaymentMethod} from '@/types/api'
-
-function isValidDateRange(startTime: string, endTime: string) {
-	if (!(startTime && endTime)) {
-		return false
-	}
-
-	const start = new Date(startTime)
-	const end = new Date(endTime)
-
-	return (
-		!(Number.isNaN(start.valueOf()) || Number.isNaN(end.valueOf())) &&
-		start.valueOf() > Date.now() &&
-		end.valueOf() > start.valueOf()
-	)
-}
 
 export function BookingPage() {
 	const {session} = useAuth()
 	const {showFeedback} = useFeedback()
 	const navigate = useNavigate()
 	const [searchParams] = useSearchParams()
+	const requestedFacilityId = searchParams.get('facilityId') || ''
 	const queryClient = useQueryClient()
 	const [errorMessage, setErrorMessage] = useState<string | null>(null)
 	const [hasSubmitted, setHasSubmitted] = useState(false)
-	const [form, setForm] = useState({
-		endTime: '',
-		facilityId: searchParams.get('facilityId') || '',
-		paymentMethod: 'CREDIT_CARD' as PaymentMethod,
-		startTime: ''
-	})
+	const [form, setForm] = useState<BookingDraft>(() =>
+		createInitialBookingDraft(requestedFacilityId)
+	)
+
+	useEffect(() => {
+		if (!requestedFacilityId) {
+			return
+		}
+
+		setForm(currentForm =>
+			currentForm.facilityId === requestedFacilityId
+				? currentForm
+				: {...currentForm, facilityId: requestedFacilityId}
+		)
+	}, [requestedFacilityId])
+
+	useEffect(() => {
+		saveBookingDraft(form)
+	}, [form])
 
 	const facilitiesQuery = useQuery({
 		queryFn: () => listFacilities(),
@@ -151,6 +162,7 @@ export function BookingPage() {
 			})
 		},
 		async onSuccess() {
+			clearBookingDraft()
 			await queryClient.invalidateQueries({
 				queryKey: ['bookings', session?.userId]
 			})
@@ -194,8 +206,7 @@ export function BookingPage() {
 				<CardHeader>
 					<CardTitle>Create a booking</CardTitle>
 					<CardDescription>
-						Choose a facility, confirm the time window, and pay with the
-						selected method.
+						Choose a facility and time window, then complete the reservation.
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
@@ -316,49 +327,16 @@ export function BookingPage() {
 										Quoted total: {formatCurrency(quoteQuery.data.totalPrice)}
 									</div>
 									<div className='mt-1 text-sm'>
-										{quoteQuery.data.hours} hours × multiplier{' '}
-										{quoteQuery.data.multiplier}
+										Duration: {formatDuration(quoteQuery.data.hours)}.
+									</div>
+									<div className='mt-1 text-sm'>
+										{formatRateSummary(quoteQuery.data.multiplier)}
 									</div>
 								</Alert>
 							) : null}
 
 							{selectedFacility ? (
-								<div className='rounded-xl border border-slate-800 bg-slate-900/50 p-4 text-sm text-slate-300'>
-									<div className='grid gap-3 sm:grid-cols-3'>
-										<div>
-											<div className='text-slate-500'>Facility</div>
-											<div className='mt-1 text-white'>
-												{selectedFacility.name}
-											</div>
-										</div>
-										<div>
-											<div className='text-slate-500'>Base price</div>
-											<div className='mt-1 text-white'>
-												{formatCurrency(selectedFacility.basePricePerHour)}/h
-											</div>
-										</div>
-										<div>
-											<div className='text-slate-500'>Hours</div>
-											<div className='mt-1 text-white'>
-												{selectedFacility.workingHoursStart} -{' '}
-												{selectedFacility.workingHoursEnd}
-											</div>
-										</div>
-									</div>
-									<Link
-										className='block w-full sm:w-auto'
-										to={`/facilities/${selectedFacility.id}`}
-									>
-										<Button
-											className='mt-4 w-full sm:w-auto'
-											size='sm'
-											type='button'
-											variant='outline'
-										>
-											View details
-										</Button>
-									</Link>
-								</div>
+								<SelectedFacilitySummary facility={selectedFacility} />
 							) : null}
 
 							{hasSubmitted && bookingValidationErrors.length > 0 ? (

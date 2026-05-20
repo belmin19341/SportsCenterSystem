@@ -77,14 +77,17 @@ export function HomePage() {
 								{isSignedIn ? 'Create a booking' : 'Sign in to continue'}
 							</Button>
 						</Link>
-						<Link
-							className='w-full sm:w-auto'
-							to={isSignedIn ? '/dashboard' : '/login'}
-						>
-							<Button className='w-full sm:w-auto' size='lg' variant='outline'>
-								{isSignedIn ? 'Open dashboard' : 'View the app shell'}
-							</Button>
-						</Link>
+						{isSignedIn ? (
+							<Link className='w-full sm:w-auto' to='/dashboard'>
+								<Button
+									className='w-full sm:w-auto'
+									size='lg'
+									variant='outline'
+								>
+									Open dashboard
+								</Button>
+							</Link>
+						) : null}
 					</CardContent>
 				</Card>
 

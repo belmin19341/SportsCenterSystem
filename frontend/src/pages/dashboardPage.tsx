@@ -164,10 +164,7 @@ export function DashboardPage() {
 				<Card>
 					<CardHeader>
 						<CardTitle>Profile</CardTitle>
-						<CardDescription>
-							Identity comes from User Service, but the session is managed in
-							the frontend.
-						</CardDescription>
+						<CardDescription>Your account details.</CardDescription>
 					</CardHeader>
 					<CardContent>
 						{userQuery.isPending ? (
@@ -219,7 +216,7 @@ export function DashboardPage() {
 							<div className='space-y-4'>
 								<div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
 									<div>
-										className='mt-1 text-sm text-slate-400' data-wrap='anywhere'
+										<div className='text-sm text-slate-400'>Tier</div>
 										<div className='mt-1 text-2xl font-semibold text-white'>
 											{loyaltyQuery.data.tier}
 										</div>
@@ -335,9 +332,7 @@ export function DashboardPage() {
 				<Card>
 					<CardHeader>
 						<CardTitle>Rentals</CardTitle>
-						<CardDescription>
-							Equipment rental history from Booking Service.
-						</CardDescription>
+						<CardDescription>Your equipment rental history.</CardDescription>
 					</CardHeader>
 					<CardContent>
 						{rentalsQuery.isPending ? (
@@ -375,10 +370,9 @@ export function DashboardPage() {
 
 				<Card>
 					<CardHeader>
-						<CardTitle>Payment feedback</CardTitle>
+						<CardTitle>Payments</CardTitle>
 						<CardDescription>
-							Derived through booking-scoped payment lookups because there is no
-							user-scoped payment endpoint yet.
+							Payment status for your recent bookings.
 						</CardDescription>
 					</CardHeader>
 					<CardContent>
@@ -462,7 +456,7 @@ export function DashboardPage() {
 												<div className='font-medium text-white'>
 													{notification.subject}
 												</div>
-												<div className='wrap-anywhere mt-1 text-sm text-slate-400'>
+												<div className='ssc-text-wrap mt-1 text-sm text-slate-400'>
 													{notification.message}
 												</div>
 												<div className='mt-2 text-xs text-slate-500'>

@@ -1,6 +1,23 @@
 import {App} from '@/App'
 import {fireEvent, render, screen, waitFor} from '@/test-utils'
 
+function storeSignedInSession() {
+	localStorage.setItem(
+		'sportscenter-session',
+		JSON.stringify({
+			accessToken: 'access-token',
+			accessTokenExpiresAt: Date.now() + 60_000,
+			email: 'john@example.com',
+			refreshToken: 'refresh-token',
+			refreshTokenExpiresAt: Date.now() + 600_000,
+			role: 'USER',
+			tokenType: 'Bearer',
+			userId: 1,
+			username: 'john_doe'
+		})
+	)
+}
+
 it('renders the public discovery view with live sections', async () => {
 	render(<App />, {route: '/'})
 
@@ -50,20 +67,7 @@ it('logs in and loads secured dashboard data', async () => {
 })
 
 it('creates a booking only after quote and conflict checks pass', async () => {
-	localStorage.setItem(
-		'sportscenter-session',
-		JSON.stringify({
-			accessToken: 'access-token',
-			accessTokenExpiresAt: Date.now() + 60_000,
-			email: 'john@example.com',
-			refreshToken: 'refresh-token',
-			refreshTokenExpiresAt: Date.now() + 600_000,
-			role: 'USER',
-			tokenType: 'Bearer',
-			userId: 1,
-			username: 'john_doe'
-		})
-	)
+	storeSignedInSession()
 	render(<App />, {route: '/bookings/new?facilityId=1'})
 
 	await screen.findByRole('heading', {name: /create a booking/iu})
@@ -78,6 +82,9 @@ it('creates a booking only after quote and conflict checks pass', async () => {
 		screen.findByText(/selected time is available/iu)
 	).resolves.toBeInTheDocument()
 	await expect(screen.findByText(/quoted total/iu)).resolves.toBeInTheDocument()
+	await expect(
+		screen.findByText(/standard hourly rate applied/iu)
+	).resolves.toBeInTheDocument()
 
 	await waitFor(() => {
 		expect(screen.getByRole('button', {name: /book now/iu})).toBeEnabled()
@@ -87,4 +94,25 @@ it('creates a booking only after quote and conflict checks pass', async () => {
 	await expect(
 		screen.findByText(/booking created/iu)
 	).resolves.toBeInTheDocument()
+})
+
+it('keeps the booking draft when navigating away and back', async () => {
+	storeSignedInSession()
+	const {user} = render(<App />, {route: '/bookings/new?facilityId=1'})
+
+	fireEvent.change(await screen.findByLabelText(/start time/iu), {
+		target: {value: '2099-05-21T10:00'}
+	})
+	fireEvent.change(screen.getByLabelText(/end time/iu), {
+		target: {value: '2099-05-21T11:00'}
+	})
+
+	await user.click(screen.getByRole('link', {name: /dashboard/iu}))
+	await screen.findByRole('heading', {name: /profile/iu})
+	await user.click(screen.getByRole('link', {name: /new booking/iu}))
+
+	await expect(screen.findByLabelText(/start time/iu)).resolves.toHaveValue(
+		'2099-05-21T10:00'
+	)
+	expect(screen.getByLabelText(/end time/iu)).toHaveValue('2099-05-21T11:00')
 })

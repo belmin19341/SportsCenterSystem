@@ -9,19 +9,25 @@ import {cn} from '@/lib/utils'
 
 const navLinkClassName = ({isActive}: {isActive: boolean}) =>
 	cn(
-		'shrink-0 rounded-md px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-900 hover:text-white',
+		'block rounded-md px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-900 hover:text-white',
 		isActive && 'bg-slate-900 text-white'
 	)
 
 export function AppHeader() {
 	const {isSignedIn, logout, session} = useAuth()
 	const {showFeedback} = useFeedback()
+	const [isMenuOpen, setIsMenuOpen] = useState(false)
 	const [isLoggingOut, setIsLoggingOut] = useState(false)
+
+	function closeMenu() {
+		setIsMenuOpen(false)
+	}
 
 	async function handleLogout() {
 		setIsLoggingOut(true)
 		try {
 			await logout()
+			closeMenu()
 			showFeedback({
 				description: 'Your local session was cleared.',
 				title: 'Signed out',
@@ -38,66 +44,113 @@ export function AppHeader() {
 				<div className='flex min-w-0 items-center justify-between gap-3 lg:justify-start'>
 					<Link
 						className='truncate text-base font-semibold text-white sm:text-lg'
+						onClick={closeMenu}
 						to='/'
 					>
 						SportsCenterSystem
 					</Link>
-					<Badge className='hidden sm:inline-flex' variant='muted'>
-						Gateway-first frontend
-					</Badge>
+					<Button
+						aria-controls='app-navigation'
+						aria-expanded={isMenuOpen}
+						aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
+						className='h-10 w-10 px-0 lg:hidden'
+						onClick={() => setIsMenuOpen(current => !current)}
+						type='button'
+						variant='outline'
+					>
+						<span
+							aria-hidden={true}
+							className='flex h-4 w-5 flex-col justify-between'
+						>
+							<span className='h-0.5 rounded-full bg-current' />
+							<span className='h-0.5 rounded-full bg-current' />
+							<span className='h-0.5 rounded-full bg-current' />
+						</span>
+					</Button>
 				</div>
 
-				<nav className='-mx-1 flex max-w-full gap-1 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:gap-2 sm:px-0 sm:pb-0 lg:justify-center'>
-					<NavLink className={navLinkClassName} to='/'>
-						Explore
-					</NavLink>
-					{isSignedIn ? (
-						<>
-							<NavLink className={navLinkClassName} to='/dashboard'>
-								Dashboard
-							</NavLink>
-							<NavLink className={navLinkClassName} to='/bookings/new'>
-								New booking
-							</NavLink>
-							{session && canManageFacilities(session.role) ? (
-								<NavLink className={navLinkClassName} to='/owner/facilities'>
-									Facilities
-								</NavLink>
-							) : null}
-						</>
-					) : (
-						<NavLink className={navLinkClassName} to='/login'>
-							Sign in
+				<div
+					className={cn(
+						'border-t border-slate-800/80 pt-3 lg:flex lg:flex-1 lg:items-center lg:justify-between lg:border-0 lg:pt-0',
+						isMenuOpen ? 'block' : 'hidden lg:flex'
+					)}
+					id='app-navigation'
+				>
+					<nav className='grid gap-1 lg:flex lg:flex-wrap lg:items-center lg:justify-center lg:gap-2'>
+						<NavLink className={navLinkClassName} onClick={closeMenu} to='/'>
+							Explore
 						</NavLink>
-					)}
-				</nav>
-
-				<div className='flex min-w-0 flex-wrap items-center justify-between gap-2 sm:justify-end lg:flex-nowrap'>
-					{session ? (
-						<>
-							<div className='min-w-0 text-left sm:text-right'>
-								<div className='truncate text-sm font-medium text-white'>
-									{session.username}
-								</div>
-								<div className='hidden truncate text-xs text-slate-400 sm:block'>
-									{session.email}
-								</div>
-							</div>
-							<Badge>{session.role}</Badge>
-							<Button
-								onClick={() => {
-									void handleLogout()
-								}}
-								variant='outline'
+						{isSignedIn ? (
+							<>
+								<NavLink
+									className={navLinkClassName}
+									onClick={closeMenu}
+									to='/dashboard'
+								>
+									Dashboard
+								</NavLink>
+								<NavLink
+									className={navLinkClassName}
+									onClick={closeMenu}
+									to='/bookings/new'
+								>
+									New booking
+								</NavLink>
+								{session && canManageFacilities(session.role) ? (
+									<NavLink
+										className={navLinkClassName}
+										onClick={closeMenu}
+										to='/owner/facilities'
+									>
+										Facilities
+									</NavLink>
+								) : null}
+							</>
+						) : (
+							<NavLink
+								className={navLinkClassName}
+								onClick={closeMenu}
+								to='/login'
 							>
-								{isLoggingOut ? 'Signing out...' : 'Sign out'}
-							</Button>
-						</>
-					) : (
-						<Link className='w-full sm:w-auto' to='/login'>
-							<Button className='w-full sm:w-auto'>Open app</Button>
-						</Link>
-					)}
+								Sign in
+							</NavLink>
+						)}
+					</nav>
+
+					<div className='mt-3 grid min-w-0 gap-2 lg:mt-0 lg:flex lg:items-center lg:justify-end lg:gap-3'>
+						{session ? (
+							<>
+								<div className='min-w-0'>
+									<div className='truncate text-sm font-medium text-white'>
+										{session.username}
+									</div>
+									<div className='truncate text-xs text-slate-400'>
+										{session.email}
+									</div>
+								</div>
+								<div className='flex items-center gap-2'>
+									<Badge>{session.role}</Badge>
+									<Button
+										className='ml-auto lg:ml-0'
+										onClick={() => {
+											void handleLogout()
+										}}
+										variant='outline'
+									>
+										{isLoggingOut ? 'Signing out...' : 'Sign out'}
+									</Button>
+								</div>
+							</>
+						) : (
+							<Link
+								className='w-full lg:w-auto'
+								onClick={closeMenu}
+								to='/login'
+							>
+								<Button className='w-full lg:w-auto'>Open app</Button>
+							</Link>
+						)}
+					</div>
 				</div>
 			</div>
 		</header>
