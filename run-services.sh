@@ -310,6 +310,13 @@ if [ "$START_LB" = true ]; then
         echo "   PID: $!"
         ensure_health_or_fail "$LB_HEALTH_URL" "resource-service-2" "/tmp/resource-service-2.log"
     fi
+else
+    LB_PORT=${RESOURCE_SERVICE_PORT_2:-8092}
+    if lsof -ti tcp:"$LB_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+        echo ""
+        echo "🧪 Zaustavljam resource-service-2 ($LB_PORT) za single-instance režim..."
+        stop_port_processes "$LB_PORT" "resource-service-2"
+    fi
 fi
 
 echo ""
@@ -325,4 +332,9 @@ else
 fi
 echo "  Swagger:   http://localhost:808X/swagger-ui.html"
 echo "  Logovi:    tail -f /tmp/<service>.log"
+if [ "$START_LB" = true ]; then
+    echo "  LB mode:   2x resource-service (${RESOURCE_SERVICE_PORT:-8082}, ${RESOURCE_SERVICE_PORT_2:-8092})"
+else
+    echo "  LB mode:   1x resource-service (${RESOURCE_SERVICE_PORT:-8082})"
+fi
 echo "═══════════════════════════════════════════════════════════════"
