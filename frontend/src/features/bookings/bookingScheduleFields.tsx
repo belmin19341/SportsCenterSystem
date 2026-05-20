@@ -35,7 +35,9 @@ export function BookingScheduleFields({
 			<div className='space-y-2'>
 				<Label htmlFor='startTime'>Start time</Label>
 				<DateTimePicker
-					caption={facilityHoursLabel ? `Available ${facilityHoursLabel}` : undefined}
+					caption={
+						facilityHoursLabel ? `Available ${facilityHoursLabel}` : undefined
+					}
 					id='startTime'
 					maxTime={normalizedWorkingHoursEnd}
 					minTime={normalizedWorkingHoursStart}
@@ -50,7 +52,11 @@ export function BookingScheduleFields({
 			<div className='space-y-2'>
 				<Label htmlFor='endTime'>End time</Label>
 				<DateTimePicker
-					caption={facilityHoursLabel ? `Finish inside ${facilityHoursLabel}` : undefined}
+					caption={
+						facilityHoursLabel
+							? `Finish inside ${facilityHoursLabel}`
+							: undefined
+					}
 					disabled={!startTime}
 					id='endTime'
 					maxTime={normalizedWorkingHoursEnd}

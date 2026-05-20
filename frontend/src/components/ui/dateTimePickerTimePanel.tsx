@@ -42,7 +42,11 @@ export function DateTimePickerTimePanel({
 	value
 }: DateTimePickerTimePanelProps) {
 	return (
-		<div className={mode === 'datetime' ? 'mt-4 border-t border-slate-800 pt-4' : ''}>
+		<div
+			className={
+				mode === 'datetime' ? 'mt-4 border-t border-slate-800 pt-4' : ''
+			}
+		>
 			<div className='flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between'>
 				<div>
 					<div className='text-xs uppercase tracking-[0.22em] text-slate-500'>

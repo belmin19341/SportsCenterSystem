@@ -68,12 +68,13 @@ export function DateTimePickerCalendar({
 							aria-label='Visible month'
 							className={pickerSelectClassName}
 							onChange={event =>
-								setVisibleMonth(currentMonth =>
-									new Date(
-										currentMonth.getFullYear(),
-										Number(event.target.value),
-										1
-									)
+								setVisibleMonth(
+									currentMonth =>
+										new Date(
+											currentMonth.getFullYear(),
+											Number(event.target.value),
+											1
+										)
 								)
 							}
 							value={visibleMonth.getMonth()}
@@ -95,8 +96,7 @@ export function DateTimePickerCalendar({
 								}
 
 								setVisibleMonth(
-									currentMonth =>
-										new Date(nextYear, currentMonth.getMonth(), 1)
+									currentMonth => new Date(nextYear, currentMonth.getMonth(), 1)
 								)
 							}}
 							type='number'

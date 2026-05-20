@@ -116,8 +116,8 @@ it('keeps the booking draft when navigating away and back', async () => {
 	await screen.findByRole('heading', {name: /profile/iu})
 	await user.click(screen.getByRole('link', {name: /new booking/iu}))
 
-	await expect(screen.findByLabelText(/start time/iu)).resolves.toHaveTextContent(
-		'10:00'
-	)
+	await expect(
+		screen.findByLabelText(/start time/iu)
+	).resolves.toHaveTextContent('10:00')
 	expect(screen.getByLabelText(/end time/iu)).toHaveTextContent('11:00')
 })
