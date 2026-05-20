@@ -3,42 +3,88 @@ package ba.nwt.userservice.security;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import javax.crypto.SecretKey;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.interfaces.RSAPublicKey;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 /**
- * JWT (JSON Web Token) Utility Component.
+ * JWT (JSON Web Token) Utility Component — RS256 (asymmetric).
  *
- * Generates two distinct token types:
- *   - access  (short-lived, default 15 min) → carried in Authorization: Bearer …
- *   - refresh (long-lived,  default  7 days) → only valid on POST /api/auth/refresh
+ * <p><b>Signing algorithm:</b> RS256 (RSASSA-PKCS1-v1_5 with SHA-256).
  *
- * Both tokens carry a unique {@code jti} so they can be revoked individually
- * via the gateway blacklist (access) or the local refresh blacklist (refresh).
+ * <p><b>Trust boundary:</b>
+ * <ul>
+ *   <li>The RSA <b>private key</b> lives ONLY inside the User Service —
+ *       only this service can mint (sign) tokens.</li>
+ *   <li>The RSA <b>public key</b> is distributed to verifiers (currently the
+ *       API Gateway). Verifiers can validate signatures but cannot forge new
+ *       tokens. This eliminates the HS256 shared-secret problem where any
+ *       service holding the key was also implicitly a token issuer.</li>
+ * </ul>
+ *
+ * <p><b>Issued claims (registered + custom):</b>
+ * <pre>
+ *   sub      → user id (registered, identifies the principal)
+ *   iss      → "sports-center-user-service" (registered)
+ *   aud      → "sports-center-api"          (registered, intended recipient)
+ *   iat      → issued-at  (registered)
+ *   exp      → expires-at (registered, validated by parser)
+ *   jti      → unique id  (registered, used for revocation / blacklist)
+ *   type     → "access" | "refresh" (prevents refresh-as-access misuse)
+ *   roles    → ["USER"] / ["ADMIN"] / ["OWNER"]
+ *   username → cached identifier for downstream logging
+ *   email    → cached identifier (access tokens only)
+ * </pre>
+ *
+ * <p><b>Refresh tokens:</b> generated with {@code type=refresh}, only accepted
+ * by {@code POST /api/auth/refresh}. Verifiers refuse any token whose
+ * {@code type} is not {@code access} on protected routes, so a stolen refresh
+ * token cannot be used to call business APIs.
  */
 @Component
 public class JwtTokenProvider {
 
-    @Value("${jwt.secret:SportsCenterSystemSecretKeyForJWTTokenDevelopmentOnly2026}")
-    private String jwtSecret;
+    public static final String CLAIM_TYPE   = "type";
+    public static final String CLAIM_ROLES  = "roles";
+    public static final String TYPE_ACCESS  = "access";
+    public static final String TYPE_REFRESH = "refresh";
 
-    /** Access token TTL in seconds. Backwards-compatible with the old jwt.expiration property. */
+    @Value("${jwt.private-key-path:classpath:keys/jwt-private.pem}")
+    private String privateKeyPath;
+
+    @Value("${jwt.public-key-path:classpath:keys/jwt-public.pem}")
+    private String publicKeyPath;
+
+    @Value("${jwt.issuer:sports-center-user-service}")
+    private String issuer;
+
+    @Value("${jwt.audience:sports-center-api}")
+    private String audience;
+
+    @Value("${jwt.kid:sports-key-1}")
+    private String keyId;
+
     @Value("${jwt.access.expiration:${jwt.expiration:900}}")
     private long accessTokenExpirationSec;
 
-    /** Refresh token TTL in seconds (default 7 days). */
     @Value("${jwt.refresh.expiration:604800}")
     private long refreshTokenExpirationSec;
 
-    private SecretKey getSigningKey() {
-        return Keys.hmacShaKeyFor(jwtSecret.getBytes());
+    private RSAPrivateKey privateKey;
+    private RSAPublicKey publicKey;
+
+    @PostConstruct
+    void init() {
+        this.privateKey = PemKeyLoader.loadPrivate(privateKeyPath);
+        this.publicKey  = PemKeyLoader.loadPublic(publicKeyPath);
     }
 
     /* ────────────────────────────────────────────────────────────────────── *
@@ -52,10 +98,8 @@ public class JwtTokenProvider {
         Map<String, Object> claims = new HashMap<>();
         claims.put("username", username);
         claims.put("email", email);
-        claims.put("role", role);
-        claims.put("roles", new String[]{role});
-        claims.put("type", "access");
-        claims.put("jti", UUID.randomUUID().toString());
+        claims.put(CLAIM_ROLES, List.of(role));
+        claims.put(CLAIM_TYPE, TYPE_ACCESS);
         return createToken(claims, userId.toString(), accessTokenExpirationSec);
     }
 
@@ -67,13 +111,12 @@ public class JwtTokenProvider {
     public String generateRefreshToken(Long userId, String username, String role) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("username", username);
-        claims.put("role", role);
-        claims.put("type", "refresh");
-        claims.put("jti", UUID.randomUUID().toString());
+        claims.put(CLAIM_ROLES, List.of(role));
+        claims.put(CLAIM_TYPE, TYPE_REFRESH);
         return createToken(claims, userId.toString(), refreshTokenExpirationSec);
     }
 
-    /** Backwards-compatible alias used in older tests / code paths. */
+    /** Backwards-compatible alias used in older code paths. */
     public String generateToken(Long userId, String username, String email, String role) {
         return generateAccessToken(userId, username, email, role);
     }
@@ -82,84 +125,62 @@ public class JwtTokenProvider {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + expirationSec * 1000);
         return Jwts.builder()
+                .setHeaderParam("kid", keyId)
+                .setHeaderParam("typ", "JWT")
                 .setClaims(claims)
                 .setSubject(subject)
+                .setIssuer(issuer)
+                .setAudience(audience)
+                .setId(UUID.randomUUID().toString())   // jti
                 .setIssuedAt(now)
                 .setExpiration(expiry)
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .signWith(privateKey, SignatureAlgorithm.RS256)
                 .compact();
     }
 
     /* ────────────────────────────────────────────────────────────────────── *
-     *  Claim extraction
+     *  Claim extraction / validation
      * ────────────────────────────────────────────────────────────────────── */
 
     public Claims getAllClaimsFromToken(String token) {
         return Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
+                .setSigningKey(publicKey)
+                .requireIssuer(issuer)
+                .requireAudience(audience)
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
     }
 
-    public Long getUserIdFromToken(String token) {
-        return Long.parseLong(getAllClaimsFromToken(token).getSubject());
-    }
-
-    public String getUsernameFromToken(String token) {
-        return getAllClaimsFromToken(token).get("username", String.class);
-    }
+    public Long   getUserIdFromToken(String token)   { return Long.parseLong(getAllClaimsFromToken(token).getSubject()); }
+    public String getUsernameFromToken(String token) { return getAllClaimsFromToken(token).get("username", String.class); }
 
     public String getRoleFromToken(String token) {
-        return getAllClaimsFromToken(token).get("role", String.class);
+        Object roles = getAllClaimsFromToken(token).get(CLAIM_ROLES);
+        if (roles instanceof List<?> list && !list.isEmpty()) {
+            return String.valueOf(list.get(0));
+        }
+        return null;
     }
 
-    /** "access" or "refresh"; null for legacy tokens that did not carry the claim. */
     public String getTypeFromToken(String token) {
-        Object t = getAllClaimsFromToken(token).get("type");
+        Object t = getAllClaimsFromToken(token).get(CLAIM_TYPE);
         return t == null ? null : t.toString();
     }
 
-    public String getJtiFromToken(String token) {
-        Claims claims = getAllClaimsFromToken(token);
-        String jti = claims.getId();
-        if (jti == null) {
-            Object o = claims.get("jti");
-            jti = o == null ? null : o.toString();
-        }
-        return jti;
-    }
-
-    public Date getExpirationDateFromToken(String token) {
-        return getAllClaimsFromToken(token).getExpiration();
-    }
-
-    /* ────────────────────────────────────────────────────────────────────── *
-     *  Validation
-     * ────────────────────────────────────────────────────────────────────── */
+    public String getJtiFromToken(String token)        { return getAllClaimsFromToken(token).getId(); }
+    public Date   getExpirationDateFromToken(String t) { return getAllClaimsFromToken(t).getExpiration(); }
 
     public Boolean isTokenExpired(String token) {
-        try {
-            return getExpirationDateFromToken(token).before(new Date());
-        } catch (Exception e) {
-            return true;
-        }
+        try { return getExpirationDateFromToken(token).before(new Date()); }
+        catch (Exception e) { return true; }
     }
 
     public Boolean validateToken(String token) {
-        try {
-            Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(token);
-            return !isTokenExpired(token);
-        } catch (Exception e) {
-            return false;
-        }
+        try { getAllClaimsFromToken(token); return true; }
+        catch (Exception e) { return false; }
     }
 
-    public long getAccessTokenExpirationSec() {
-        return accessTokenExpirationSec;
-    }
-
-    public long getRefreshTokenExpirationSec() {
-        return refreshTokenExpirationSec;
-    }
+    public long getAccessTokenExpirationSec()  { return accessTokenExpirationSec; }
+    public long getRefreshTokenExpirationSec() { return refreshTokenExpirationSec; }
 }

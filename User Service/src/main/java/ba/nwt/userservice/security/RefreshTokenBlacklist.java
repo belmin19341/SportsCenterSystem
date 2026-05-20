@@ -8,12 +8,26 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Local in-memory blacklist for REFRESH tokens.
+ * Local in-memory blacklist for <b>refresh</b> tokens.
  *
- * <p>Access tokens are validated/blacklisted at the API Gateway, but refresh
- * tokens never leave the User Service (the only place that consumes them is
- * {@code POST /api/auth/refresh}). Storing revoked refresh JTIs here is enough
- * to make logout fully effective.</p>
+ * <p>Access tokens are blacklisted at the API Gateway (see
+ * {@code TokenBlacklistService}). Refresh tokens never leave the User Service —
+ * the only endpoint that consumes them is {@code POST /api/auth/refresh}, where
+ * they are validated and rotated. Storing revoked refresh JTIs locally is
+ * therefore sufficient to make logout fully effective.</p>
+ *
+ * <p><b>Data:</b> {@code ConcurrentHashMap<jti, expEpochMs>}; O(1) lookup.</p>
+ *
+ * <p><b>Cleanup:</b> lazy eviction on {@link #isBlacklisted(String)} +
+ * scheduled sweep every 5 minutes. Memory is bounded by the number of revoked
+ * refresh tokens that have not yet reached their {@code exp} (7 days by default).</p>
+ *
+ * <p><b>Restart behavior:</b> the map is in-memory and is lost when the User
+ * Service restarts. Practical impact: a revoked refresh token could be accepted
+ * once more before being rotated/blacklisted again — limited because refresh-token
+ * rotation also revokes the old JTI in-process at {@code AuthenticationService#refresh}.
+ * Production would persist this in Redis or a small DB table for durability and
+ * for multi-instance deployments.</p>
  */
 @Slf4j
 @Component

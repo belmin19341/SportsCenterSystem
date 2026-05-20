@@ -2,29 +2,54 @@ package ba.nwt.apigateway.security;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import javax.crypto.SecretKey;
+import java.security.interfaces.RSAPublicKey;
+import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 
 /**
- * JWT Validator for API Gateway
- * Validates JWT tokens from incoming requests
+ * Gateway-side JWT verifier (RS256).
+ *
+ * <p>The gateway only holds the RSA <b>public</b> key — it can verify
+ * signatures but cannot mint tokens. The signing key never leaves the
+ * User Service.</p>
+ *
+ * <p><b>Claim policy enforced on parse:</b>
+ * <ul>
+ *   <li>signature must match {@code jwt-public.pem}</li>
+ *   <li>{@code iss} must equal {@code jwt.issuer}</li>
+ *   <li>{@code aud} must equal {@code jwt.audience}</li>
+ *   <li>{@code exp} not in the past (enforced by jjwt automatically)</li>
+ * </ul>
+ * The {@code type} (access vs refresh) and revocation (jti) checks happen
+ * in {@link JwtAuthenticationFilter} because they are context-dependent
+ * (some endpoints — e.g. {@code /api/auth/refresh} — must accept refresh
+ * tokens).</p>
  */
 @Component
 public class JwtValidator {
 
-    @Value("${jwt.secret:SportsCenterSystemSecretKeyForJWTTokenDevelopmentOnly2026}")
-    private String jwtSecret;
+    @Value("${jwt.public-key-path:classpath:keys/jwt-public.pem}")
+    private String publicKeyPath;
 
-    private SecretKey getSigningKey() {
-        return io.jsonwebtoken.security.Keys.hmacShaKeyFor(jwtSecret.getBytes());
+    @Value("${jwt.issuer:sports-center-user-service}")
+    private String issuer;
+
+    @Value("${jwt.audience:sports-center-api}")
+    private String audience;
+
+    private RSAPublicKey publicKey;
+
+    @PostConstruct
+    void init() {
+        this.publicKey = PemKeyLoader.loadPublic(publicKeyPath);
     }
 
-    /**
-     * Extract JWT token from Authorization header
-     */
+    /** Extract the raw JWT from a {@code Bearer …} header. */
     public String extractToken(String authHeader) {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return null;
@@ -32,91 +57,69 @@ public class JwtValidator {
         return authHeader.substring(7);
     }
 
-    /**
-     * Validate JWT token signature and expiration
-     */
+    /** Verify signature + iss + aud + exp. */
     public boolean validateToken(String token) {
         try {
-            Jwts.parserBuilder()
-                    .setSigningKey(getSigningKey())
-                    .build()
-                    .parseClaimsJws(token);
-            return !isTokenExpired(token);
+            getAllClaims(token);
+            return true;
         } catch (Exception e) {
             return false;
         }
     }
 
-    /**
-     * Check if token is expired
-     */
     public boolean isTokenExpired(String token) {
         try {
-            Claims claims = Jwts.parserBuilder()
-                    .setSigningKey(getSigningKey())
-                    .build()
-                    .parseClaimsJws(token)
-                    .getBody();
-            return claims.getExpiration().before(new Date());
+            return getAllClaims(token).getExpiration().before(new Date());
         } catch (Exception e) {
             return true;
         }
     }
 
-    /**
-     * Extract all claims from token
-     */
     public Claims getAllClaims(String token) {
         return Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
+                .setSigningKey(publicKey)
+                .requireIssuer(issuer)
+                .requireAudience(audience)
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
     }
 
-    /**
-     * Get user ID from token
-     */
     public Long getUserIdFromToken(String token) {
-        Claims claims = getAllClaims(token);
-        return Long.parseLong(claims.getSubject());
+        return Long.parseLong(getAllClaims(token).getSubject());
     }
 
-    /**
-     * Get username from token
-     */
     public String getUsernameFromToken(String token) {
-        Claims claims = getAllClaims(token);
-        return claims.get("username", String.class);
+        return getAllClaims(token).get("username", String.class);
     }
 
-    /**
-     * Get role from token
-     */
+    /** Returns the first role (compat helper for header propagation). */
     public String getRoleFromToken(String token) {
-        Claims claims = getAllClaims(token);
-        return claims.get("role", String.class);
+        List<String> roles = getRolesFromToken(token);
+        return roles.isEmpty() ? null : roles.get(0);
     }
 
-    /**
-     * Get JTI (token id) used for blacklisting and audit.
-     */
-    public String getJtiFromToken(String token) {
-        Claims claims = getAllClaims(token);
-        // jti can be either the standard "jti" header or our explicit claim
-        String jti = claims.getId();
-        if (jti == null) {
-            Object o = claims.get("jti");
-            jti = o == null ? null : o.toString();
+    /** Returns all roles from the {@code roles} claim. */
+    @SuppressWarnings("unchecked")
+    public List<String> getRolesFromToken(String token) {
+        Object raw = getAllClaims(token).get("roles");
+        if (raw instanceof List<?> list) {
+            return (List<String>) list;
         }
-        return jti;
+        return Collections.emptyList();
     }
 
-    /**
-     * Get the original expiration time as epoch milliseconds.
-     */
+    /** Returns {@code "access"} or {@code "refresh"} from the {@code type} claim. */
+    public String getTypeFromToken(String token) {
+        Object t = getAllClaims(token).get("type");
+        return t == null ? null : t.toString();
+    }
+
+    public String getJtiFromToken(String token) {
+        return getAllClaims(token).getId();
+    }
+
     public long getExpirationEpochMs(String token) {
-        Claims claims = getAllClaims(token);
-        return claims.getExpiration().getTime();
+        return getAllClaims(token).getExpiration().getTime();
     }
 }
