@@ -58,13 +58,32 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
                     "/api/users/**",
                     "/api/bookings/**",
                     "/api/payments/**",
-                    "/api/resources/**"
+                    "/api/facilities/**",
+                    "/api/equipment/**",
+                    "/api/pricing-rules/**",
+                    "/api/rentals/**",
+                    "/api/reviews/**",
+                    "/api/notifications/**",
+                    "/api/loyalty/**",
+                    "/api/achievements/**",
+                    "/api/user-achievements/**"
             },
             "OWNER", new String[]{
                     "/api/users/**",
                     "/api/bookings/**",
                     "/api/payments/**",
-                    "/api/resources/**"
+                    "/api/facilities/**",
+                    "/api/equipment/**",
+                    "/api/pricing-rules/**",
+                    "/api/rentals/**",
+                    "/api/reviews/**",
+                    "/api/notifications/**",
+                    "/api/loyalty/**",
+                    "/api/achievements/**",
+                    "/api/user-achievements/**",
+                    "/api/documents/**",
+                    "/api/booking-users/**",
+                    "/api/lb-demo/**"
             },
             "ADMIN", new String[]{ "**" }
     );
@@ -94,7 +113,7 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
             }
 
             // Public routes do not require a token
-            if (isPublicRoute(path)) {
+            if (isPublicRoute(path, method)) {
                 return chain.filter(exchange);
             }
 
@@ -169,9 +188,16 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
      * - /api/auth/logout — revokes the bearer token; user-service inspects the
      *   Authorization header internally and tolerates missing / invalid tokens
      * - /api/auth/validate — used by clients to check token state
+     * - GET /api/facilities/**, GET /api/equipment/** — public discovery data
      * - swagger / openapi / actuator / health — operational endpoints
      */
-    private boolean isPublicRoute(String path) {
+    private boolean isPublicRoute(String path, HttpMethod method) {
+        if (HttpMethod.GET.equals(method)
+                && (matchesPathPrefix(path, "/api/facilities")
+                || matchesPathPrefix(path, "/api/equipment"))) {
+            return true;
+        }
+
         return path.endsWith("/api/auth/login")
                 || path.endsWith("/api/auth/refresh")
                 || path.endsWith("/api/auth/logout")
@@ -210,9 +236,13 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
         }
         if (pattern.endsWith("/**")) {
             String prefix = pattern.substring(0, pattern.length() - 3);
-            return path.equals(prefix) || path.startsWith(prefix + "/") || path.startsWith(prefix);
+            return matchesPathPrefix(path, prefix);
         }
         return pattern.equals(path);
+    }
+
+    private boolean matchesPathPrefix(String path, String prefix) {
+        return path.equals(prefix) || path.startsWith(prefix + "/");
     }
 
     /** Best-effort client IP extraction (X-Forwarded-For or remote address). */

@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Authentication Service
@@ -36,13 +37,14 @@ public class AuthenticationService {
 
     /* ────────────────────────────────────────────────────────────────────── */
 
+    @Transactional
     public AuthResponseDTO authenticate(LoginRequestDTO loginRequest) {
         log.info("Login attempt for username: {}", loginRequest.getUsername());
 
         User user = userRepository.findByUsername(loginRequest.getUsername())
                 .orElseThrow(() -> new BadCredentialsException("Invalid username or password"));
 
-        if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPasswordHash())) {
+        if (!passwordMatches(loginRequest.getPassword(), user)) {
             log.warn("Invalid password for user: {}", loginRequest.getUsername());
             throw new BadCredentialsException("Invalid username or password");
         }
@@ -63,6 +65,33 @@ public class AuthenticationService {
                 jwtTokenProvider.getAccessTokenExpirationSec(),
                 jwtTokenProvider.getRefreshTokenExpirationSec()
         );
+    }
+
+    private boolean passwordMatches(String rawPassword, User user) {
+        String storedPassword = user.getPasswordHash();
+
+        if (storedPassword == null || storedPassword.isBlank()) {
+            return false;
+        }
+
+        if (looksLikeBcryptHash(storedPassword)) {
+            return passwordEncoder.matches(rawPassword, storedPassword);
+        }
+
+        if (!storedPassword.equals(rawPassword)) {
+            return false;
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(rawPassword));
+        userRepository.save(user);
+        log.info("Upgraded legacy plain-text password storage for user: {}", user.getUsername());
+        return true;
+    }
+
+    private boolean looksLikeBcryptHash(String value) {
+        return value.startsWith("$2a$")
+                || value.startsWith("$2b$")
+                || value.startsWith("$2y$");
     }
 
     /* ────────────────────────────────────────────────────────────────────── */

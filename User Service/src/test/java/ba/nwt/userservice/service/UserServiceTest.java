@@ -10,8 +10,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -29,6 +31,9 @@ class UserServiceTest {
 
     @Mock
     private ModelMapper modelMapper;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
 
     @InjectMocks
     private UserService userService;
@@ -100,13 +105,36 @@ class UserServiceTest {
 
         when(userRepository.existsByUsername("newuser")).thenReturn(false);
         when(userRepository.existsByEmail("new@example.com")).thenReturn(false);
+        when(passwordEncoder.encode("password123")).thenReturn("encoded-password");
         when(userRepository.save(any(User.class))).thenReturn(user);
         when(modelMapper.map(any(User.class), eq(UserResponseDTO.class))).thenReturn(responseDTO);
 
         UserResponseDTO result = userService.createUser(requestDTO);
 
         assertThat(result).isNotNull();
-        verify(userRepository).save(any(User.class));
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(captor.capture());
+        assertThat(captor.getValue().getPasswordHash()).isEqualTo("encoded-password");
+    }
+
+    @Test
+    void updateUser_shouldHashPassword() {
+        UserRequestDTO requestDTO = UserRequestDTO.builder()
+                .username("testuser")
+                .email("test@example.com")
+                .password("new-password")
+                .role(User.Role.USER)
+                .phone("+38762111111")
+                .build();
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(passwordEncoder.encode("new-password")).thenReturn("encoded-new-password");
+        when(userRepository.save(any(User.class))).thenReturn(user);
+        when(modelMapper.map(any(User.class), eq(UserResponseDTO.class))).thenReturn(responseDTO);
+
+        userService.updateUser(1L, requestDTO);
+
+        assertThat(user.getPasswordHash()).isEqualTo("encoded-new-password");
     }
 
     @Test
@@ -142,4 +170,3 @@ class UserServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 }
-
