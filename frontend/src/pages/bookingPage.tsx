@@ -13,7 +13,7 @@ import {
 	CardHeader,
 	CardTitle
 } from '@/components/ui/card'
-import {Input} from '@/components/ui/input'
+import {DateTimePicker} from '@/components/ui/dateTimePicker'
 import {Label} from '@/components/ui/label'
 import {createBooking, listConflictingBookings} from '@/features/bookings/api'
 import {
@@ -27,9 +27,17 @@ import {
 	formatRateSummary
 } from '@/features/bookings/pricingCopy'
 import {SelectedFacilitySummary} from '@/features/bookings/selectedFacilitySummary'
-import {isValidDateRange} from '@/features/bookings/timeRange'
+import {getSuggestedEndTime, isValidDateRange} from '@/features/bookings/timeRange'
 import {getFacilityPriceQuote, listFacilities} from '@/features/resources/api'
 import {formatCurrency, getErrorMessage} from '@/lib/format'
+import {
+	addLocalDateTimeMinutes,
+	formatTimeRange,
+	normalizeTimeValue,
+	parseLocalDateTime,
+	roundDateUp,
+	toLocalDateTimeValue
+} from '@/lib/localDateTime'
 import {validateBookingForm} from '@/lib/validation'
 import type {PaymentMethod} from '@/types/api'
 
@@ -105,6 +113,18 @@ export function BookingPage() {
 			),
 		[facilitiesQuery.data, form.facilityId]
 	)
+		const facilityHoursLabel = selectedFacility
+			? formatTimeRange(
+					selectedFacility.workingHoursStart,
+					selectedFacility.workingHoursEnd
+			  )
+			: ''
+		const minimumBookingDateTime = useMemo(
+			() => toLocalDateTimeValue(roundDateUp(new Date(Date.now() + 5 * 60_000), 15)),
+			[]
+		)
+		const minimumEndDateTime =
+			addLocalDateTimeMinutes(form.startTime, 1) || minimumBookingDateTime
 	const bookingValidationErrors = useMemo(
 		() =>
 			validateBookingForm({
@@ -122,6 +142,28 @@ export function BookingPage() {
 			selectedFacility
 		]
 	)
+
+	function handleStartTimeChange(nextStartTime: string) {
+		setForm(currentForm => {
+			if (!nextStartTime) {
+				return {...currentForm, endTime: '', startTime: ''}
+			}
+
+			const parsedCurrentEndTime = parseLocalDateTime(currentForm.endTime)
+			const parsedNextStartTime = parseLocalDateTime(nextStartTime)
+			const shouldSuggestEndTime =
+				!(parsedCurrentEndTime && parsedNextStartTime) ||
+				parsedCurrentEndTime.valueOf() <= parsedNextStartTime.valueOf()
+
+			return {
+				...currentForm,
+				endTime: shouldSuggestEndTime
+					? getSuggestedEndTime(nextStartTime, selectedFacility?.workingHoursEnd)
+					: currentForm.endTime,
+				startTime: nextStartTime
+			}
+		})
+	}
 
 	const bookingMutation = useMutation({
 		mutationFn: () => {
@@ -242,32 +284,48 @@ export function BookingPage() {
 							<div className='grid gap-5 md:grid-cols-2'>
 								<div className='space-y-2'>
 									<Label htmlFor='startTime'>Start time</Label>
-									<Input
-										id='startTime'
-										onChange={event =>
-											setForm(currentForm => ({
-												...currentForm,
-												startTime: event.target.value
-											}))
+									<DateTimePicker
+										caption={
+											facilityHoursLabel
+												? `Available ${facilityHoursLabel}`
+												: undefined
 										}
-										required={true}
-										type='datetime-local'
+										id='startTime'
+										maxTime={normalizeTimeValue(selectedFacility?.workingHoursEnd)}
+										minTime={normalizeTimeValue(selectedFacility?.workingHoursStart)}
+										minValue={minimumBookingDateTime}
+										onChange={handleStartTimeChange}
+										placeholder='Choose when the booking should begin'
+										quickStepMinutes={60}
 										value={form.startTime}
 									/>
 								</div>
 
 								<div className='space-y-2'>
 									<Label htmlFor='endTime'>End time</Label>
-									<Input
+									<DateTimePicker
+										caption={
+											facilityHoursLabel
+												? `Finish inside ${facilityHoursLabel}`
+												: undefined
+										}
+										disabled={!form.startTime}
 										id='endTime'
-										onChange={event =>
+										maxTime={normalizeTimeValue(selectedFacility?.workingHoursEnd)}
+										minTime={normalizeTimeValue(selectedFacility?.workingHoursStart)}
+										minValue={minimumEndDateTime}
+										onChange={nextEndTime =>
 											setForm(currentForm => ({
 												...currentForm,
-												endTime: event.target.value
+												endTime: nextEndTime
 											}))
 										}
-										required={true}
-										type='datetime-local'
+										placeholder={
+											form.startTime
+												? 'Choose when the booking should end'
+												: 'Select the start time first'
+										}
+										quickStepMinutes={60}
 										value={form.endTime}
 									/>
 								</div>

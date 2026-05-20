@@ -13,6 +13,7 @@ import {
 	CardHeader,
 	CardTitle
 } from '@/components/ui/card'
+import {DateTimePicker} from '@/components/ui/dateTimePicker'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {
@@ -21,6 +22,7 @@ import {
 	listOwnerFacilities
 } from '@/features/resources/api'
 import {formatCurrency, getErrorMessage} from '@/lib/format'
+import {formatTimeRange} from '@/lib/localDateTime'
 import {validateFacilityForm} from '@/lib/validation'
 import type {FacilityRequest, FacilityStatus, FacilityType} from '@/types/api'
 
@@ -223,31 +225,35 @@ export function OwnerFacilitiesPage() {
 						<div className='grid gap-4 sm:grid-cols-2'>
 							<div className='space-y-2'>
 								<Label htmlFor='hoursStart'>Opens</Label>
-								<Input
+								<DateTimePicker
+									caption='Shown as the first available booking time.'
 									id='hoursStart'
-									onChange={event =>
+									mode='time'
+									onChange={nextValue =>
 										setForm(current => ({
 											...current,
-											workingHoursStart: event.target.value
+											workingHoursStart: nextValue
 										}))
 									}
-									required={true}
-									type='time'
+									placeholder='Choose the opening time'
+									quickStepMinutes={60}
 									value={form.workingHoursStart}
 								/>
 							</div>
 							<div className='space-y-2'>
 								<Label htmlFor='hoursEnd'>Closes</Label>
-								<Input
+								<DateTimePicker
+									caption='Shown as the last available booking time.'
 									id='hoursEnd'
-									onChange={event =>
+									mode='time'
+									onChange={nextValue =>
 										setForm(current => ({
 											...current,
-											workingHoursEnd: event.target.value
+											workingHoursEnd: nextValue
 										}))
 									}
-									required={true}
-									type='time'
+									placeholder='Choose the closing time'
+									quickStepMinutes={60}
 									value={form.workingHoursEnd}
 								/>
 							</div>
@@ -308,8 +314,10 @@ export function OwnerFacilitiesPage() {
 												{facility.name}
 											</div>
 											<div className='mt-1 text-slate-400'>
-												{facility.workingHoursStart} -{' '}
-												{facility.workingHoursEnd}
+												{formatTimeRange(
+													facility.workingHoursStart,
+													facility.workingHoursEnd
+												)}
 											</div>
 										</div>
 										<div className='flex flex-wrap gap-2 sm:justify-end'>

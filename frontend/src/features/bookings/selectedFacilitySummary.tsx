@@ -1,6 +1,7 @@
 import {Link} from 'react-router'
 import {Button} from '@/components/ui/button'
 import {formatCurrency} from '@/lib/format'
+import {formatTimeRange} from '@/lib/localDateTime'
 import type {FacilityResponse} from '@/types/api'
 
 export function SelectedFacilitySummary({
@@ -24,7 +25,10 @@ export function SelectedFacilitySummary({
 				<div>
 					<div className='text-slate-500'>Hours</div>
 					<div className='mt-1 text-white'>
-						{facility.workingHoursStart} - {facility.workingHoursEnd}
+						{formatTimeRange(
+							facility.workingHoursStart,
+							facility.workingHoursEnd
+						)}
 					</div>
 				</div>
 			</div>

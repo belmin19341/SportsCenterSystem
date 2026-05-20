@@ -27,6 +27,7 @@ import {
 	listPricingRulesForFacility
 } from '@/features/resources/api'
 import {formatCurrency, formatDateTime, getErrorMessage} from '@/lib/format'
+import {formatTimeRange} from '@/lib/localDateTime'
 import {validateReviewForm} from '@/lib/validation'
 
 function humanizeLabel(value: string) {
@@ -185,7 +186,10 @@ export function FacilityPage() {
 						<div>
 							<div className='text-slate-500'>Hours</div>
 							<div className='mt-1 font-medium text-white'>
-								{facility.workingHoursStart} - {facility.workingHoursEnd}
+								{formatTimeRange(
+									facility.workingHoursStart,
+									facility.workingHoursEnd
+								)}
 							</div>
 						</div>
 					</CardContent>

@@ -1,3 +1,4 @@
+import {formatTimeRange} from '@/lib/localDateTime'
 import type {FacilityRequest, FacilityResponse, PriceQuote} from '@/types/api'
 
 const MAX_USERNAME_LENGTH = 100
@@ -102,7 +103,10 @@ export function validateBookingForm(input: BookingValidationInput) {
 			(requestedStart < open || requestedEnd > close)
 		) {
 			errors.push(
-				`Selected time must fit facility hours (${input.facility.workingHoursStart} - ${input.facility.workingHoursEnd}).`
+				`Selected time must fit facility hours (${formatTimeRange(
+					input.facility.workingHoursStart,
+					input.facility.workingHoursEnd
+				)}).`
 			)
 		}
 	}

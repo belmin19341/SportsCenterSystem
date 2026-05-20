@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/card'
 import {listEquipment, listFacilities} from '@/features/resources/api'
 import {formatCurrency} from '@/lib/format'
+import {formatTimeRange} from '@/lib/localDateTime'
 import type {FacilityStatus, FacilityType} from '@/types/api'
 
 function humanizeLabel(value: string) {
@@ -218,7 +219,10 @@ export function HomePage() {
 									<div className='flex flex-wrap items-center justify-between gap-2'>
 										<span>Hours</span>
 										<span>
-											{facility.workingHoursStart} - {facility.workingHoursEnd}
+											{formatTimeRange(
+												facility.workingHoursStart,
+												facility.workingHoursEnd
+											)}
 										</span>
 									</div>
 									<div className='flex flex-wrap gap-2 pt-2'>

@@ -1,5 +1,5 @@
 import {App} from '@/App'
-import {fireEvent, render, screen, waitFor} from '@/test-utils'
+import {fireEvent, render, screen, waitFor, within} from '@/test-utils'
 
 function storeSignedInSession() {
 	localStorage.setItem(
@@ -16,6 +16,19 @@ function storeSignedInSession() {
 			username: 'john_doe'
 		})
 	)
+}
+
+async function chooseBookingTime(
+	user: ReturnType<typeof render>['user'],
+	fieldLabel: RegExp,
+	timeLabel: string
+) {
+	await user.click(await screen.findByLabelText(fieldLabel))
+	const dialog = screen.getByRole('dialog', {
+		name: /choose booking date and time/iu
+	})
+	await user.click(within(dialog).getByRole('button', {name: /tomorrow/iu}))
+	await user.click(within(dialog).getByRole('button', {name: timeLabel}))
 }
 
 it('renders the public discovery view with live sections', async () => {
@@ -68,15 +81,11 @@ it('logs in and loads secured dashboard data', async () => {
 
 it('creates a booking only after quote and conflict checks pass', async () => {
 	storeSignedInSession()
-	render(<App />, {route: '/bookings/new?facilityId=1'})
+	const {user} = render(<App />, {route: '/bookings/new?facilityId=1'})
 
 	await screen.findByRole('heading', {name: /create a booking/iu})
-	fireEvent.change(await screen.findByLabelText(/start time/iu), {
-		target: {value: '2099-05-21T10:00'}
-	})
-	fireEvent.change(screen.getByLabelText(/end time/iu), {
-		target: {value: '2099-05-21T11:00'}
-	})
+	await chooseBookingTime(user, /start time/iu, '10:00')
+	expect(screen.getByLabelText(/end time/iu)).toHaveTextContent('11:00')
 
 	await expect(
 		screen.findByText(/selected time is available/iu)
@@ -100,19 +109,15 @@ it('keeps the booking draft when navigating away and back', async () => {
 	storeSignedInSession()
 	const {user} = render(<App />, {route: '/bookings/new?facilityId=1'})
 
-	fireEvent.change(await screen.findByLabelText(/start time/iu), {
-		target: {value: '2099-05-21T10:00'}
-	})
-	fireEvent.change(screen.getByLabelText(/end time/iu), {
-		target: {value: '2099-05-21T11:00'}
-	})
+	await chooseBookingTime(user, /start time/iu, '10:00')
+	expect(screen.getByLabelText(/end time/iu)).toHaveTextContent('11:00')
 
 	await user.click(screen.getByRole('link', {name: /dashboard/iu}))
 	await screen.findByRole('heading', {name: /profile/iu})
 	await user.click(screen.getByRole('link', {name: /new booking/iu}))
 
-	await expect(screen.findByLabelText(/start time/iu)).resolves.toHaveValue(
-		'2099-05-21T10:00'
+	await expect(screen.findByLabelText(/start time/iu)).resolves.toHaveTextContent(
+		'10:00'
 	)
-	expect(screen.getByLabelText(/end time/iu)).toHaveValue('2099-05-21T11:00')
+	expect(screen.getByLabelText(/end time/iu)).toHaveTextContent('11:00')
 })
