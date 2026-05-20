@@ -14,15 +14,30 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
-import java.util.*;
+import java.util.List;
 
 /**
- * JWT Authentication Filter Factory for Spring Cloud Gateway
- * - validates JWT token signature and expiration
- * - rejects blacklisted (logged-out) tokens via {@link TokenBlacklistService}
- * - applies a per-IP rate limit on /api/auth/login via {@link RateLimitService}
- * - enforces role-based access control (RBAC) using prefix-matching
- * - propagates user info via {@code X-User-Id}, {@code X-User-Name}, {@code X-User-Role} headers
+ * Gateway filter — <b>authentication + identity propagation only</b>.
+ *
+ * <p>Responsibilities (kept intentionally small):
+ * <ul>
+ *   <li>verify the JWT signature, {@code iss}, {@code aud}, {@code exp}
+ *       via {@link JwtValidator},</li>
+ *   <li>reject revoked (logged-out) tokens via {@link TokenBlacklistService},</li>
+ *   <li>reject {@code type=refresh} tokens on protected routes (refresh tokens
+ *       may only be used on {@code /api/auth/refresh}),</li>
+ *   <li>apply per-IP rate limit on {@code POST /api/auth/login},</li>
+ *   <li>propagate identity to downstream services via {@code X-User-Id},
+ *       {@code X-User-Name}, {@code X-User-Role}, {@code X-User-Roles}.</li>
+ * </ul>
+ *
+ * <p><b>Authorization (RBAC, ownership, business rules) is NOT performed here.</b>
+ * The gateway intentionally stays "dumb": it does centralized
+ * <em>authentication</em>, while each downstream microservice performs
+ * <em>decentralized authorization</em> on its own domain objects
+ * (e.g. "user X may update only their own booking", "OWNER may edit only their
+ * own facility"). That keeps domain knowledge inside the domain service and
+ * avoids a fat, leaky gateway.</p>
  */
 @Slf4j
 @Component
@@ -39,54 +54,6 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
 
     @Value("${security.ratelimit.login.enabled:true}")
     private boolean rateLimitEnabled;
-
-    /**
-     * RBAC matrix: role -> array of path prefixes (or "**" for full access).
-     * Path is matched via {@link #pathAllowed(String, String)} using:
-     *   - exact match
-     *   - "/foo/**" prefix match
-     *   - "**" wildcard
-     *
-     * Note on USER permissions:
-     *   USER can call all booking, payment and resource endpoints. Object-level
-     *   ownership (e.g. "user X may only update their own booking") is the
-     *   responsibility of each downstream service, which receives X-User-Id and
-     *   X-User-Role headers from the gateway.
-     */
-    private static final Map<String, String[]> ROLE_PERMISSIONS = Map.of(
-            "USER",  new String[]{
-                    "/api/users/**",
-                    "/api/bookings/**",
-                    "/api/payments/**",
-                    "/api/facilities/**",
-                    "/api/equipment/**",
-                    "/api/pricing-rules/**",
-                    "/api/rentals/**",
-                    "/api/reviews/**",
-                    "/api/notifications/**",
-                    "/api/loyalty/**",
-                    "/api/achievements/**",
-                    "/api/user-achievements/**"
-            },
-            "OWNER", new String[]{
-                    "/api/users/**",
-                    "/api/bookings/**",
-                    "/api/payments/**",
-                    "/api/facilities/**",
-                    "/api/equipment/**",
-                    "/api/pricing-rules/**",
-                    "/api/rentals/**",
-                    "/api/reviews/**",
-                    "/api/notifications/**",
-                    "/api/loyalty/**",
-                    "/api/achievements/**",
-                    "/api/user-achievements/**",
-                    "/api/documents/**",
-                    "/api/booking-users/**",
-                    "/api/lb-demo/**"
-            },
-            "ADMIN", new String[]{ "**" }
-    );
 
     public JwtAuthenticationFilter() {
         super(JwtAuthenticationFilter.Config.class);
@@ -117,9 +84,7 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
                 return chain.filter(exchange);
             }
 
-            // Extract authorization header
             String authHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-
             if (authHeader == null || authHeader.isEmpty()) {
                 log.warn("Missing authorization header for path: {}", path);
                 return onError(exchange, "Missing authorization header", HttpStatus.UNAUTHORIZED);
@@ -128,51 +93,44 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
             try {
                 String token = jwtValidator.extractToken(authHeader);
                 if (token == null) {
-                    log.warn("Invalid authorization header format");
                     return onError(exchange, "Invalid authorization header", HttpStatus.UNAUTHORIZED);
                 }
 
+                // 1. signature + iss + aud + exp
                 if (!jwtValidator.validateToken(token)) {
-                    log.warn("Invalid or expired token");
                     return onError(exchange, "Invalid or expired token", HttpStatus.UNAUTHORIZED);
                 }
 
-                // Reject revoked (logged-out) tokens
+                // 2. refresh tokens may not access protected resources
+                String type = jwtValidator.getTypeFromToken(token);
+                if (type == null || !"access".equalsIgnoreCase(type)) {
+                    log.warn("Non-access token (type={}) used on protected route {}", type, path);
+                    return onError(exchange,
+                            "Refresh token cannot be used to access protected resources",
+                            HttpStatus.UNAUTHORIZED);
+                }
+
+                // 3. revocation check (logged-out / forcibly-revoked tokens)
                 String jti = jwtValidator.getJtiFromToken(token);
                 if (blacklist.isBlacklisted(jti)) {
                     log.warn("Blacklisted token used: jti={}", jti);
                     return onError(exchange, "Token has been revoked (logged out)", HttpStatus.UNAUTHORIZED);
                 }
 
-                // Extract user information from token
+                // 4. propagate identity — downstream services do authorization
                 Long userId = jwtValidator.getUserIdFromToken(token);
                 String username = jwtValidator.getUsernameFromToken(token);
-                String role = jwtValidator.getRoleFromToken(token);
+                List<String> roles = jwtValidator.getRolesFromToken(token);
+                String primaryRole = roles.isEmpty() ? "" : roles.get(0);
 
-                // Refresh tokens may not be used as access tokens (only on /api/auth/refresh)
-                Object type = jwtValidator.getAllClaims(token).get("type");
-                if (type != null && "refresh".equalsIgnoreCase(type.toString())) {
-                    log.warn("Refresh token used as access token by user '{}'", username);
-                    return onError(exchange, "Refresh token cannot be used to access protected resources",
-                            HttpStatus.UNAUTHORIZED);
-                }
-
-                // Check role-based access control
-                if (!hasAccessToPath(role, path)) {
-                    log.warn("User '{}' with role '{}' attempting unauthorized access to: {}",
-                            username, role, path);
-                    return onError(exchange, "Insufficient permissions for this resource", HttpStatus.FORBIDDEN);
-                }
-
-                // Add user information to request headers
                 ServerHttpRequest modifiedRequest = request.mutate()
                         .header("X-User-Id", userId.toString())
-                        .header("X-User-Name", username)
-                        .header("X-User-Role", role)
+                        .header("X-User-Name", username == null ? "" : username)
+                        .header("X-User-Role", primaryRole)              // legacy single role
+                        .header("X-User-Roles", String.join(",", roles)) // canonical multi-role
                         .build();
 
-                log.info("User authenticated: username={}, role={}, path={}", username, role, path);
-
+                log.info("Authenticated: user={}, roles={}, path={}", username, roles, path);
                 return chain.filter(exchange.mutate().request(modifiedRequest).build());
 
             } catch (Exception e) {
@@ -184,12 +142,13 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
 
     /**
      * Public routes that bypass JWT validation.
-     * - /api/auth/login, /api/auth/refresh — credential / token exchange
-     * - /api/auth/logout — revokes the bearer token; user-service inspects the
-     *   Authorization header internally and tolerates missing / invalid tokens
-     * - /api/auth/validate — used by clients to check token state
-     * - GET /api/facilities/**, GET /api/equipment/** — public discovery data
-     * - swagger / openapi / actuator / health — operational endpoints
+     * <ul>
+     *   <li>{@code /api/auth/login}, {@code /api/auth/refresh} — credential / token exchange</li>
+     *   <li>{@code /api/auth/logout}, {@code /api/auth/validate} — User Service inspects
+     *       the Authorization header internally</li>
+     *   <li>{@code GET /api/facilities/**}, {@code GET /api/equipment/**} — public catalog data</li>
+     *   <li>swagger / openapi / actuator / health — operational endpoints</li>
+     * </ul>
      */
     private boolean isPublicRoute(String path, HttpMethod method) {
         if (HttpMethod.GET.equals(method)
@@ -197,7 +156,6 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
                 || matchesPathPrefix(path, "/api/equipment"))) {
             return true;
         }
-
         return path.endsWith("/api/auth/login")
                 || path.endsWith("/api/auth/refresh")
                 || path.endsWith("/api/auth/logout")
@@ -208,37 +166,6 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
                 || path.contains("/v3/api-docs")
                 || path.endsWith("/health")
                 || path.startsWith("/actuator");
-    }
-
-    /**
-     * Check if user role has access to the requested path
-     */
-    private boolean hasAccessToPath(String role, String path) {
-        if (role == null) {
-            return false;
-        }
-        String[] patterns = ROLE_PERMISSIONS.get(role.toUpperCase(Locale.ROOT));
-        if (patterns == null) {
-            return false;
-        }
-        for (String pattern : patterns) {
-            if (pathAllowed(pattern, path)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /** Match "/foo/**", "/foo/bar" or "**" against the request path. */
-    private boolean pathAllowed(String pattern, String path) {
-        if ("**".equals(pattern) || "/**".equals(pattern)) {
-            return true;
-        }
-        if (pattern.endsWith("/**")) {
-            String prefix = pattern.substring(0, pattern.length() - 3);
-            return matchesPathPrefix(path, prefix);
-        }
-        return pattern.equals(path);
     }
 
     private boolean matchesPathPrefix(String path, String prefix) {
@@ -258,23 +185,17 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
         return "unknown";
     }
 
-    /**
-     * Handle authentication/authorization error
-     */
     private Mono<Void> onError(ServerWebExchange exchange, String message, HttpStatus status) {
         ServerHttpResponse response = exchange.getResponse();
         response.setStatusCode(status);
         response.getHeaders().add("Content-Type", "application/json");
 
-        // Uniform error format aligned with downstream services' ApiError shape:
-        //   { "error": "<short error label>", "status": <int>, "message": "<details>" }
-        String errorLabel;
-        switch (status) {
-            case UNAUTHORIZED -> errorLabel = "Unauthorized";
-            case FORBIDDEN -> errorLabel = "Forbidden";
-            case TOO_MANY_REQUESTS -> errorLabel = "Too Many Requests";
-            default -> errorLabel = "Error";
-        }
+        String errorLabel = switch (status) {
+            case UNAUTHORIZED -> "Unauthorized";
+            case FORBIDDEN -> "Forbidden";
+            case TOO_MANY_REQUESTS -> "Too Many Requests";
+            default -> "Error";
+        };
 
         String errorBody = String.format(
                 "{\"error\":\"%s\",\"status\":%d,\"message\":\"%s\"}",
@@ -286,9 +207,5 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
         );
     }
 
-    /**
-     * Configuration class for the filter
-     */
-    public static class Config {
-    }
+    public static class Config { }
 }
