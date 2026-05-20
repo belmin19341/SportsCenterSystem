@@ -1,6 +1,6 @@
 import {cn} from '@/lib/utils'
-import {DateTimePickerCalendar} from './dateTimePickerCalendar'
 import {type DateTimePickerProps} from './dateTimePicker.shared'
+import {DateTimePickerCalendar} from './dateTimePickerCalendar'
 import {useDateTimePickerState} from './dateTimePickerState'
 import {DateTimePickerTimePanel} from './dateTimePickerTimePanel'
 
@@ -32,7 +32,7 @@ export function DateTimePicker({
 		setTimeValue,
 		setVisibleMonth,
 		visibleMonth
-	} = useDateTimePickerState({...props, mode})
+	} = useDateTimePickerState({...props, id, mode})
 	const panelId = `${id}-panel`
 
 	return (

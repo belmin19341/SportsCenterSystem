@@ -171,8 +171,7 @@ export function useDateTimePickerState({
 	)
 	const calendarDays =
 		mode === 'datetime' ? buildCalendarDays(visibleMonth) : []
-	const quickDateOptions =
-		mode === 'datetime' ? createQuickDateOptions() : []
+	const quickDateOptions = mode === 'datetime' ? createQuickDateOptions() : []
 	const displayValue =
 		mode === 'datetime'
 			? formatPickerDateTime(normalizedValue)
@@ -182,7 +181,7 @@ export function useDateTimePickerState({
 			? `Available ${formatTimeRange(
 					normalizedMinTime || '00:00',
 					normalizedMaxTime || '23:59'
-			  )}`
+				)}`
 			: mode === 'datetime'
 				? 'Pick a date, then fine-tune the exact time.'
 				: 'Choose the opening or closing time.'
@@ -198,7 +197,7 @@ export function useDateTimePickerState({
 			: toLocalTimeValue(
 					Math.floor(bounds.lowerBound / 60),
 					bounds.lowerBound % 60
-			  )
+				)
 
 		onChange(combineLocalDateAndTime(dateValue, nextTime))
 	}

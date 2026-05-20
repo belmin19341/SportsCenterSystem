@@ -40,7 +40,6 @@ import {
 	toLocalDateTimeValue
 } from '@/lib/localDateTime'
 import {validateBookingForm} from '@/lib/validation'
-import type {PaymentMethod} from '@/types/api'
 
 export function BookingPage() {
 	const {session} = useAuth()
