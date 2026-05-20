@@ -189,7 +189,7 @@ export function BookingPage() {
 	}
 
 	return (
-		<div className='mx-auto max-w-4xl space-y-6'>
+		<div className='mx-auto w-full max-w-4xl space-y-5 sm:space-y-6'>
 			<Card>
 				<CardHeader>
 					<CardTitle>Create a booking</CardTitle>
@@ -204,7 +204,7 @@ export function BookingPage() {
 					) : facilitiesQuery.isError ? (
 						<LoadingOrError error={facilitiesQuery.error} />
 					) : (
-						<form className='space-y-6' onSubmit={handleSubmit}>
+						<form className='space-y-5 sm:space-y-6' onSubmit={handleSubmit}>
 							<div className='space-y-2'>
 								<Label htmlFor='facilityId'>Facility</Label>
 								<select
@@ -345,9 +345,12 @@ export function BookingPage() {
 											</div>
 										</div>
 									</div>
-									<Link to={`/facilities/${selectedFacility.id}`}>
+									<Link
+										className='block w-full sm:w-auto'
+										to={`/facilities/${selectedFacility.id}`}
+									>
 										<Button
-											className='mt-4'
+											className='mt-4 w-full sm:w-auto'
 											size='sm'
 											type='button'
 											variant='outline'

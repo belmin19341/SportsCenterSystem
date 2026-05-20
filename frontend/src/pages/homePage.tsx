@@ -54,12 +54,12 @@ export function HomePage() {
 	const equipment = equipmentQuery.data?.slice(0, 6) || []
 
 	return (
-		<div className='space-y-10'>
+		<div className='space-y-8 sm:space-y-10'>
 			<section className='grid gap-6 lg:grid-cols-[1.4fr,0.6fr]'>
 				<Card className='overflow-hidden border-sky-500/20 bg-slate-950'>
 					<CardHeader className='space-y-4'>
 						<Badge>Sports center booking</Badge>
-						<CardTitle className='max-w-2xl text-4xl leading-tight sm:text-5xl'>
+						<CardTitle className='max-w-2xl text-2xl leading-tight sm:text-4xl lg:text-5xl'>
 							Find courts, compare availability signals, and reserve your next
 							slot.
 						</CardTitle>
@@ -68,14 +68,20 @@ export function HomePage() {
 							ready to book.
 						</CardDescription>
 					</CardHeader>
-					<CardContent className='flex flex-wrap gap-3'>
-						<Link to={isSignedIn ? '/bookings/new' : '/login'}>
-							<Button size='lg'>
+					<CardContent className='flex flex-col gap-3 sm:flex-row sm:flex-wrap'>
+						<Link
+							className='w-full sm:w-auto'
+							to={isSignedIn ? '/bookings/new' : '/login'}
+						>
+							<Button className='w-full sm:w-auto' size='lg'>
 								{isSignedIn ? 'Create a booking' : 'Sign in to continue'}
 							</Button>
 						</Link>
-						<Link to={isSignedIn ? '/dashboard' : '/login'}>
-							<Button size='lg' variant='outline'>
+						<Link
+							className='w-full sm:w-auto'
+							to={isSignedIn ? '/dashboard' : '/login'}
+						>
+							<Button className='w-full sm:w-auto' size='lg' variant='outline'>
 								{isSignedIn ? 'Open dashboard' : 'View the app shell'}
 							</Button>
 						</Link>
@@ -164,7 +170,7 @@ export function HomePage() {
 			</section>
 
 			<section className='space-y-4'>
-				<div className='flex items-end justify-between gap-4'>
+				<div className='flex flex-col items-start gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4'>
 					<div>
 						<h2 className='text-2xl font-semibold text-white'>
 							Featured facilities
@@ -198,15 +204,15 @@ export function HomePage() {
 									<CardDescription>{facility.description}</CardDescription>
 								</CardHeader>
 								<CardContent className='space-y-3 text-sm text-slate-300'>
-									<div className='flex items-center justify-between'>
+									<div className='flex flex-wrap items-center justify-between gap-2'>
 										<span>Capacity</span>
 										<span>{facility.capacity}</span>
 									</div>
-									<div className='flex items-center justify-between'>
+									<div className='flex flex-wrap items-center justify-between gap-2'>
 										<span>Base price</span>
 										<span>{formatCurrency(facility.basePricePerHour)}/h</span>
 									</div>
-									<div className='flex items-center justify-between'>
+									<div className='flex flex-wrap items-center justify-between gap-2'>
 										<span>Hours</span>
 										<span>
 											{facility.workingHoursStart} - {facility.workingHoursEnd}
@@ -266,15 +272,15 @@ export function HomePage() {
 									</CardDescription>
 								</CardHeader>
 								<CardContent className='space-y-3 text-sm text-slate-300'>
-									<div className='flex items-center justify-between'>
+									<div className='flex flex-wrap items-center justify-between gap-2'>
 										<span>Category</span>
 										<span>{item.category}</span>
 									</div>
-									<div className='flex items-center justify-between'>
+									<div className='flex flex-wrap items-center justify-between gap-2'>
 										<span>Daily price</span>
 										<span>{formatCurrency(item.pricePerDay)}</span>
 									</div>
-									<div className='flex items-center justify-between'>
+									<div className='flex flex-wrap items-center justify-between gap-2'>
 										<span>Deposit</span>
 										<span>{formatCurrency(item.depositRequired)}</span>
 									</div>

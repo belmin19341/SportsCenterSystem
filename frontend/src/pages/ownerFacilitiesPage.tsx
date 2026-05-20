@@ -302,8 +302,8 @@ export function OwnerFacilitiesPage() {
 									className='rounded-lg border border-slate-800 bg-slate-900/50 p-4 text-sm text-slate-300'
 									key={facility.id}
 								>
-									<div className='flex flex-wrap items-center justify-between gap-3'>
-										<div>
+									<div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+										<div className='min-w-0'>
 											<div className='font-medium text-white'>
 												{facility.name}
 											</div>
@@ -312,7 +312,7 @@ export function OwnerFacilitiesPage() {
 												{facility.workingHoursEnd}
 											</div>
 										</div>
-										<div className='flex flex-wrap gap-2'>
+										<div className='flex flex-wrap gap-2 sm:justify-end'>
 											<Badge>{humanizeLabel(facility.type)}</Badge>
 											<Badge
 												variant={

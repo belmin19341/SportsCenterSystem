@@ -62,7 +62,7 @@ export function LoginPage() {
 	}
 
 	return (
-		<div className='mx-auto max-w-lg'>
+		<div className='mx-auto w-full max-w-lg'>
 			<Card>
 				<CardHeader>
 					<CardTitle>Sign in to continue</CardTitle>

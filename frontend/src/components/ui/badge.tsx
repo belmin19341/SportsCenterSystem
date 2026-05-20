@@ -18,14 +18,7 @@ export function Badge({
 	variant?: keyof typeof variants
 }) {
 	return (
-		<span
-			className={cn(
-				'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium',
-				variants[variant],
-				className
-			)}
-			{...props}
-		>
+		<span className={cn('ssc-badge', variants[variant], className)} {...props}>
 			{children}
 		</span>
 	)

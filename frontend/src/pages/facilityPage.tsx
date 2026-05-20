@@ -163,7 +163,9 @@ export function FacilityPage() {
 								{facility.status}
 							</Badge>
 						</div>
-						<CardTitle className='text-3xl'>{facility.name}</CardTitle>
+						<CardTitle className='text-2xl sm:text-3xl'>
+							{facility.name}
+						</CardTitle>
 						<CardDescription>{facility.description}</CardDescription>
 					</CardHeader>
 					<CardContent className='grid gap-4 text-sm text-slate-300 sm:grid-cols-3'>
@@ -204,6 +206,7 @@ export function FacilityPage() {
 							<Badge variant='muted'>No rating yet</Badge>
 						)}
 						<Link
+							className='block w-full'
 							to={
 								session ? `/bookings/new?facilityId=${facility.id}` : '/login'
 							}
@@ -242,7 +245,7 @@ export function FacilityPage() {
 										className='rounded-lg border border-slate-800 bg-slate-900/50 p-4 text-sm text-slate-300'
 										key={item.id}
 									>
-										<div className='flex items-center justify-between gap-3'>
+										<div className='flex flex-wrap items-center justify-between gap-3'>
 											<span className='font-medium text-white'>
 												{item.name}
 											</span>
@@ -250,7 +253,7 @@ export function FacilityPage() {
 												{item.quantityAvailable}/{item.quantityTotal}
 											</Badge>
 										</div>
-										<div className='mt-2 flex justify-between gap-3'>
+										<div className='mt-2 flex flex-wrap justify-between gap-3'>
 											<span>{humanizeLabel(item.type)}</span>
 											<span>{formatCurrency(item.pricePerDay)}/day</span>
 										</div>
@@ -282,7 +285,7 @@ export function FacilityPage() {
 										className='rounded-lg border border-slate-800 bg-slate-900/50 p-4 text-sm text-slate-300'
 										key={rule.id}
 									>
-										<div className='flex items-center justify-between gap-3'>
+										<div className='flex flex-wrap items-center justify-between gap-3'>
 											<span>{rule.dayOfWeek || 'Every day'}</span>
 											<Badge>{rule.priceMultiplier}x</Badge>
 										</div>
@@ -346,7 +349,11 @@ export function FacilityPage() {
 									{formError ? (
 										<Alert variant='destructive'>{formError}</Alert>
 									) : null}
-									<Button disabled={reviewMutation.isPending} type='submit'>
+									<Button
+										className='w-full sm:w-auto'
+										disabled={reviewMutation.isPending}
+										type='submit'
+									>
 										{reviewMutation.isPending ? 'Saving...' : 'Submit review'}
 									</Button>
 								</form>
@@ -356,8 +363,10 @@ export function FacilityPage() {
 								</div>
 							)
 						) : (
-							<Link to='/login'>
-								<Button type='button'>Sign in</Button>
+							<Link className='block w-full sm:w-auto' to='/login'>
+								<Button className='w-full sm:w-auto' type='button'>
+									Sign in
+								</Button>
 							</Link>
 						)}
 					</CardContent>
@@ -385,7 +394,7 @@ export function FacilityPage() {
 											className='rounded-lg border border-slate-800 bg-slate-900/50 p-4 text-sm text-slate-300'
 											key={review.id}
 										>
-											<div className='flex items-center justify-between gap-3'>
+											<div className='flex flex-wrap items-center justify-between gap-3'>
 												<Badge variant='success'>{review.rating}/5</Badge>
 												<span className='text-xs text-slate-500'>
 													{formatDateTime(review.createdAt)}

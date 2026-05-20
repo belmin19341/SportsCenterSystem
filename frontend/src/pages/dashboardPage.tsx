@@ -159,7 +159,7 @@ export function DashboardPage() {
 	}
 
 	return (
-		<div className='space-y-8'>
+		<div className='space-y-6 sm:space-y-8'>
 			<section className='grid gap-6 lg:grid-cols-2'>
 				<Card>
 					<CardHeader>
@@ -176,21 +176,27 @@ export function DashboardPage() {
 							<LoadingOrError error={userQuery.error} />
 						) : (
 							<div className='space-y-3 text-sm text-slate-300'>
-								<div className='flex items-center justify-between'>
+								<div className='flex flex-wrap items-center justify-between gap-2'>
 									<span>Username</span>
-									<span>{userQuery.data.username}</span>
+									<span className='break-all text-right'>
+										{userQuery.data.username}
+									</span>
 								</div>
-								<div className='flex items-center justify-between'>
+								<div className='flex flex-wrap items-center justify-between gap-2'>
 									<span>Email</span>
-									<span>{userQuery.data.email}</span>
+									<span className='break-all text-right'>
+										{userQuery.data.email}
+									</span>
 								</div>
-								<div className='flex items-center justify-between'>
+								<div className='flex flex-wrap items-center justify-between gap-2'>
 									<span>Role</span>
 									<Badge>{userQuery.data.role}</Badge>
 								</div>
-								<div className='flex items-center justify-between'>
+								<div className='flex flex-wrap items-center justify-between gap-2'>
 									<span>Phone</span>
-									<span>{userQuery.data.phone || '—'}</span>
+									<span className='break-all text-right'>
+										{userQuery.data.phone || '—'}
+									</span>
 								</div>
 							</div>
 						)}
@@ -211,9 +217,9 @@ export function DashboardPage() {
 							<LoadingOrError error={loyaltyQuery.error} />
 						) : (
 							<div className='space-y-4'>
-								<div className='flex items-center justify-between'>
+								<div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
 									<div>
-										<div className='text-sm text-slate-400'>Tier</div>
+										className='mt-1 text-sm text-slate-400' data-wrap='anywhere'
 										<div className='mt-1 text-2xl font-semibold text-white'>
 											{loyaltyQuery.data.tier}
 										</div>
@@ -234,14 +240,14 @@ export function DashboardPage() {
 			<section className='grid gap-6 xl:grid-cols-[1.3fr,0.7fr]'>
 				<Card>
 					<CardHeader>
-						<div className='flex flex-wrap items-start justify-between gap-4'>
+						<div className='flex flex-col items-start gap-4 sm:flex-row sm:justify-between'>
 							<div>
 								<CardTitle>Bookings</CardTitle>
 								<CardDescription>Your booking history.</CardDescription>
 							</div>
 							<select
 								aria-label='Filter bookings by status'
-								className='h-10 rounded-md border border-slate-800 bg-slate-950 px-3 text-sm text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400'
+								className='h-10 w-full rounded-md border border-slate-800 bg-slate-950 px-3 text-sm text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 sm:w-auto'
 								onChange={event =>
 									setBookingFilter(event.target.value as BookingStatus | 'ALL')
 								}
@@ -271,8 +277,8 @@ export function DashboardPage() {
 										className='rounded-xl border border-slate-800 bg-slate-900/50 p-4'
 										key={booking.id}
 									>
-										<div className='flex flex-wrap items-center justify-between gap-3'>
-											<div>
+										<div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+											<div className='min-w-0'>
 												<div className='font-medium text-white'>
 													{getFacilityName(
 														facilityNameById,
@@ -284,7 +290,7 @@ export function DashboardPage() {
 													{formatDateTime(booking.endTime)}
 												</div>
 											</div>
-											<div className='flex items-center gap-2'>
+											<div className='flex flex-wrap items-center gap-2'>
 												<Badge variant='muted'>{booking.status}</Badge>
 												<Badge>{formatCurrency(booking.totalPrice)}</Badge>
 											</div>
@@ -349,11 +355,11 @@ export function DashboardPage() {
 										className='rounded-xl border border-slate-800 bg-slate-900/50 p-4 text-sm text-slate-300'
 										key={rental.id}
 									>
-										<div className='flex items-center justify-between gap-4'>
+										<div className='flex flex-wrap items-center justify-between gap-2'>
 											<span>Equipment #{rental.equipmentId}</span>
 											<Badge variant='muted'>{rental.status}</Badge>
 										</div>
-										<div className='mt-2 flex items-center justify-between'>
+										<div className='mt-2 flex flex-wrap items-center justify-between gap-2'>
 											<span>
 												{formatDate(rental.startDate)} -{' '}
 												{formatDate(rental.endDate)}
@@ -395,11 +401,11 @@ export function DashboardPage() {
 										className='rounded-xl border border-slate-800 bg-slate-900/50 p-4 text-sm text-slate-300'
 										key={payment.id}
 									>
-										<div className='flex items-center justify-between gap-4'>
+										<div className='flex flex-wrap items-center justify-between gap-2'>
 											<span>Booking #{payment.bookingId}</span>
 											<Badge variant='success'>{payment.status}</Badge>
 										</div>
-										<div className='mt-2 flex items-center justify-between'>
+										<div className='mt-2 flex flex-wrap items-center justify-between gap-2'>
 											<span>{payment.paymentMethod}</span>
 											<span>{formatCurrency(payment.amount)}</span>
 										</div>
@@ -414,14 +420,14 @@ export function DashboardPage() {
 			<section>
 				<Card>
 					<CardHeader>
-						<div className='flex flex-wrap items-start justify-between gap-4'>
+						<div className='flex flex-col items-start gap-4 sm:flex-row sm:justify-between'>
 							<div>
 								<CardTitle>Notifications</CardTitle>
 								<CardDescription>Recent account updates.</CardDescription>
 							</div>
 							<select
 								aria-label='Filter notifications'
-								className='h-10 rounded-md border border-slate-800 bg-slate-950 px-3 text-sm text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400'
+								className='h-10 w-full rounded-md border border-slate-800 bg-slate-950 px-3 text-sm text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 sm:w-auto'
 								onChange={event =>
 									setNotificationFilter(
 										event.target.value as 'ALL' | 'READ' | 'UNREAD'
@@ -451,19 +457,19 @@ export function DashboardPage() {
 										className='rounded-xl border border-slate-800 bg-slate-900/50 p-4'
 										key={notification.id}
 									>
-										<div className='flex flex-wrap items-center justify-between gap-3'>
-											<div>
+										<div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+											<div className='min-w-0'>
 												<div className='font-medium text-white'>
 													{notification.subject}
 												</div>
-												<div className='mt-1 text-sm text-slate-400'>
+												<div className='wrap-anywhere mt-1 text-sm text-slate-400'>
 													{notification.message}
 												</div>
 												<div className='mt-2 text-xs text-slate-500'>
 													{formatDateTime(notification.sentAt)}
 												</div>
 											</div>
-											<div className='flex items-center gap-2'>
+											<div className='flex flex-wrap items-center gap-2'>
 												<Badge
 													variant={notification.isRead ? 'muted' : 'warning'}
 												>
