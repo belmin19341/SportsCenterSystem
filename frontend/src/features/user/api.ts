@@ -21,12 +21,22 @@ export function listUserAchievements(userId: number) {
 }
 
 export function listUserNotifications(userId: number) {
-	return requestJson<NotificationResponse[]>(`/api/notifications/user/${userId}`)
+	return requestJson<NotificationResponse[]>(
+		`/api/notifications/user/${userId}`
+	)
+}
+
+export function listUnreadUserNotifications(userId: number) {
+	return requestJson<NotificationResponse[]>(
+		`/api/notifications/user/${userId}/unread`
+	)
 }
 
 export function markNotificationAsRead(notificationId: number) {
-	return requestJson<NotificationResponse>(`/api/notifications/${notificationId}/read`, {
-		method: 'PATCH'
-	})
+	return requestJson<NotificationResponse>(
+		`/api/notifications/${notificationId}/read`,
+		{
+			method: 'PATCH'
+		}
+	)
 }
-

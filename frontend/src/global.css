@@ -1,4 +1,4 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
 @theme {
 	--font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
@@ -15,17 +15,19 @@
 html,
 body,
 #root {
+	width: 100%;
 	min-height: 100%;
 }
 
 body {
 	margin: 0;
+	overflow-x: hidden;
+	font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+	color: #e2e8f0;
 	background:
 		radial-gradient(circle at top, rgba(14, 165, 233, 0.14), transparent 32%),
 		radial-gradient(circle at right, rgba(16, 185, 129, 0.1), transparent 24%),
 		#020617;
-	color: #e2e8f0;
-	font-family: Inter, ui-sans-serif, system-ui, sans-serif;
 }
 
 a {
@@ -35,7 +37,25 @@ a {
 
 button,
 input,
-select {
+select,
+textarea {
+	min-width: 0;
 	font: inherit;
 }
 
+.ssc-text-wrap {
+	overflow-wrap: anywhere;
+}
+
+.ssc-badge {
+	display: inline-flex;
+	align-items: center;
+	max-width: 100%;
+	padding: 0.25rem 0.625rem;
+	font-size: 0.75rem;
+	font-weight: 500;
+	line-height: 1.25;
+	text-align: left;
+	overflow-wrap: anywhere;
+	border-radius: 9999px;
+}

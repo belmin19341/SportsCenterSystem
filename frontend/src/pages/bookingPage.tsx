@@ -1,11 +1,8 @@
-import {type FormEvent, useMemo, useState} from 'react'
-import {
-	useMutation,
-	useQuery,
-	useQueryClient
-} from '@tanstack/react-query'
-import {useNavigate} from 'react-router'
+import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
+import {type FormEvent, useEffect, useMemo, useState} from 'react'
+import {useNavigate, useSearchParams} from 'react-router'
 import {useAuth} from '@/auth/authContext'
+import {useFeedback} from '@/components/feedback'
 import {LoadingOrError} from '@/components/loadingOrError'
 import {Alert} from '@/components/ui/alert'
 import {Button} from '@/components/ui/button'
@@ -16,40 +13,68 @@ import {
 	CardHeader,
 	CardTitle
 } from '@/components/ui/card'
-import {Input} from '@/components/ui/input'
-import {Label} from '@/components/ui/label'
-import {createBooking} from '@/features/bookings/api'
+import {createBooking, listConflictingBookings} from '@/features/bookings/api'
+import {BookingBasicsFields} from '@/features/bookings/bookingBasicsFields'
 import {
-	getFacilityPriceQuote,
-	listFacilities
-} from '@/features/resources/api'
+	type BookingDraft,
+	clearBookingDraft,
+	createInitialBookingDraft,
+	saveBookingDraft
+} from '@/features/bookings/bookingDraft'
+import {BookingScheduleFields} from '@/features/bookings/bookingScheduleFields'
+import {
+	applyStartTimeToDraft,
+	createMinimumBookingDateTime,
+	getMinimumEndDateTime
+} from '@/features/bookings/bookingScheduleLogic'
+import {
+	formatDuration,
+	formatRateSummary
+} from '@/features/bookings/pricingCopy'
+import {SelectedFacilitySummary} from '@/features/bookings/selectedFacilitySummary'
+import {isValidDateRange} from '@/features/bookings/timeRange'
+import {getFacilityPriceQuote, listFacilities} from '@/features/resources/api'
 import {formatCurrency, getErrorMessage} from '@/lib/format'
-import type {PaymentMethod} from '@/types/api'
+import {validateBookingForm} from '@/lib/validation'
 
 export function BookingPage() {
 	const {session} = useAuth()
+	const {showFeedback} = useFeedback()
 	const navigate = useNavigate()
+	const [searchParams] = useSearchParams()
+	const requestedFacilityId = searchParams.get('facilityId') || ''
 	const queryClient = useQueryClient()
 	const [errorMessage, setErrorMessage] = useState<string | null>(null)
-	const [form, setForm] = useState({
-		endTime: '',
-		facilityId: '',
-		paymentMethod: 'CREDIT_CARD' as PaymentMethod,
-		startTime: ''
-	})
+	const [hasSubmitted, setHasSubmitted] = useState(false)
+	const [form, setForm] = useState<BookingDraft>(() =>
+		createInitialBookingDraft(requestedFacilityId)
+	)
+
+	useEffect(() => {
+		if (!requestedFacilityId) {
+			return
+		}
+
+		setForm(currentForm =>
+			currentForm.facilityId === requestedFacilityId
+				? currentForm
+				: {...currentForm, facilityId: requestedFacilityId}
+		)
+	}, [requestedFacilityId])
+
+	useEffect(() => {
+		saveBookingDraft(form)
+	}, [form])
 
 	const facilitiesQuery = useQuery({
-		queryFn: listFacilities,
+		queryFn: () => listFacilities(),
 		queryKey: ['facilities']
 	})
 
-	const isTimeRangeValid = useMemo(() => {
-		if (!form.startTime || !form.endTime) {
-			return false
-		}
-
-		return new Date(form.endTime).valueOf() > new Date(form.startTime).valueOf()
-	}, [form.endTime, form.startTime])
+	const isTimeRangeValid = useMemo(
+		() => isValidDateRange(form.startTime, form.endTime),
+		[form.endTime, form.startTime]
+	)
 
 	const quoteQuery = useQuery({
 		enabled: Boolean(form.facilityId) && isTimeRangeValid,
@@ -61,6 +86,21 @@ export function BookingPage() {
 			}),
 		queryKey: ['price-quote', form.facilityId, form.startTime, form.endTime]
 	})
+	const conflictsQuery = useQuery({
+		enabled: Boolean(form.facilityId) && isTimeRangeValid,
+		queryFn: () =>
+			listConflictingBookings({
+				end: form.endTime,
+				facilityId: Number(form.facilityId),
+				start: form.startTime
+			}),
+		queryKey: [
+			'booking-conflicts',
+			form.facilityId,
+			form.startTime,
+			form.endTime
+		]
+	})
 
 	const selectedFacility = useMemo(
 		() =>
@@ -69,9 +109,53 @@ export function BookingPage() {
 			),
 		[facilitiesQuery.data, form.facilityId]
 	)
+	const minimumBookingDateTime = useMemo(createMinimumBookingDateTime, [])
+	const minimumEndDateTime = getMinimumEndDateTime(
+		form.startTime,
+		minimumBookingDateTime
+	)
+	const bookingValidationErrors = useMemo(
+		() =>
+			validateBookingForm({
+				conflictCount: conflictsQuery.data?.length ?? 0,
+				endTime: form.endTime,
+				facility: selectedFacility,
+				quote: quoteQuery.data,
+				startTime: form.startTime
+			}),
+		[
+			conflictsQuery.data?.length,
+			form.endTime,
+			form.startTime,
+			quoteQuery.data,
+			selectedFacility
+		]
+	)
+
+	function handleStartTimeChange(nextStartTime: string) {
+		setForm(currentForm =>
+			applyStartTimeToDraft(
+				currentForm,
+				nextStartTime,
+				selectedFacility?.workingHoursEnd
+			)
+		)
+	}
 
 	const bookingMutation = useMutation({
-		mutationFn: async () => {
+		mutationFn: () => {
+			const validationErrors = validateBookingForm({
+				conflictCount: conflictsQuery.data?.length ?? 0,
+				endTime: form.endTime,
+				facility: selectedFacility,
+				quote: quoteQuery.data,
+				startTime: form.startTime
+			})
+
+			if (validationErrors.length > 0) {
+				throw new Error(validationErrors.join(' '))
+			}
+
 			if (!session) {
 				throw new Error('You must be signed in to create a booking.')
 			}
@@ -97,9 +181,22 @@ export function BookingPage() {
 			})
 		},
 		async onSuccess() {
-			await queryClient.invalidateQueries({queryKey: ['bookings', session?.userId]})
+			clearBookingDraft()
+			await queryClient.invalidateQueries({
+				queryKey: ['bookings', session?.userId]
+			})
+			await queryClient.invalidateQueries({queryKey: ['payments']})
+			await queryClient.invalidateQueries({
+				queryKey: ['loyalty', session?.userId]
+			})
 			await queryClient.invalidateQueries({
 				queryKey: ['notifications', session?.userId]
+			})
+			showFeedback({
+				description:
+					'The booking, payment, loyalty, and notification data were refreshed.',
+				title: 'Booking created',
+				variant: 'success'
 			})
 			navigate('/dashboard')
 		}
@@ -107,7 +204,13 @@ export function BookingPage() {
 
 	async function handleSubmit(event: FormEvent<HTMLFormElement>) {
 		event.preventDefault()
+		setHasSubmitted(true)
 		setErrorMessage(null)
+
+		if (bookingValidationErrors.length > 0) {
+			setErrorMessage(bookingValidationErrors.join(' '))
+			return
+		}
 
 		try {
 			await bookingMutation.mutateAsync()
@@ -117,14 +220,12 @@ export function BookingPage() {
 	}
 
 	return (
-		<div className='mx-auto max-w-3xl space-y-6'>
+		<div className='mx-auto w-full max-w-4xl space-y-5 sm:space-y-6'>
 			<Card>
 				<CardHeader>
 					<CardTitle>Create a booking</CardTitle>
 					<CardDescription>
-						The frontend quotes the slot through Resource Service and then sends
-						the booking to the orchestrated Booking endpoint, where price is
-						confirmed again and payment is triggered.
+						Choose a facility and time window, then complete the reservation.
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
@@ -133,92 +234,67 @@ export function BookingPage() {
 					) : facilitiesQuery.isError ? (
 						<LoadingOrError error={facilitiesQuery.error} />
 					) : (
-						<form className='space-y-5' onSubmit={handleSubmit}>
-							<div className='space-y-2'>
-								<Label htmlFor='facilityId'>Facility</Label>
-								<select
-									className='flex h-11 w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400'
-									id='facilityId'
-									onChange={event =>
-										setForm(currentForm => ({
-											...currentForm,
-											facilityId: event.target.value
-										}))
-									}
-									required={true}
-									value={form.facilityId}
-								>
-									<option value=''>Choose a facility</option>
-									{facilitiesQuery.data
-										.filter(facility => facility.status === 'ACTIVE')
-										.map(facility => (
-											<option key={facility.id} value={facility.id}>
-												{facility.name} ({facility.type})
-											</option>
-										))}
-								</select>
-							</div>
+						<form className='space-y-5 sm:space-y-6' onSubmit={handleSubmit}>
+							<BookingBasicsFields
+								facilities={facilitiesQuery.data}
+								facilityId={form.facilityId}
+								onChangeFacilityId={nextFacilityId =>
+									setForm(currentForm => ({
+										...currentForm,
+										facilityId: nextFacilityId
+									}))
+								}
+								onChangePaymentMethod={nextPaymentMethod =>
+									setForm(currentForm => ({
+										...currentForm,
+										paymentMethod: nextPaymentMethod
+									}))
+								}
+								paymentMethod={form.paymentMethod}
+							/>
 
-							<div className='grid gap-5 md:grid-cols-2'>
-								<div className='space-y-2'>
-									<Label htmlFor='startTime'>Start time</Label>
-									<Input
-										id='startTime'
-										onChange={event =>
-											setForm(currentForm => ({
-												...currentForm,
-												startTime: event.target.value
-											}))
-										}
-										required={true}
-										type='datetime-local'
-										value={form.startTime}
-									/>
-								</div>
-
-								<div className='space-y-2'>
-									<Label htmlFor='endTime'>End time</Label>
-									<Input
-										id='endTime'
-										onChange={event =>
-											setForm(currentForm => ({
-												...currentForm,
-												endTime: event.target.value
-											}))
-										}
-										required={true}
-										type='datetime-local'
-										value={form.endTime}
-									/>
-								</div>
-							</div>
-
-							<div className='space-y-2'>
-								<Label htmlFor='paymentMethod'>Payment method</Label>
-								<select
-									className='flex h-11 w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400'
-									id='paymentMethod'
-									onChange={event =>
-										setForm(currentForm => ({
-											...currentForm,
-											paymentMethod: event.target.value as PaymentMethod
-										}))
-									}
-									value={form.paymentMethod}
-								>
-									<option value='CREDIT_CARD'>Credit card</option>
-									<option value='DEBIT_CARD'>Debit card</option>
-									<option value='PAYPAL'>PayPal</option>
-								</select>
-							</div>
+							<BookingScheduleFields
+								endTime={form.endTime}
+								minimumBookingDateTime={minimumBookingDateTime}
+								minimumEndDateTime={minimumEndDateTime}
+								onChangeEndTime={nextEndTime =>
+									setForm(currentForm => ({
+										...currentForm,
+										endTime: nextEndTime
+									}))
+								}
+								onChangeStartTime={handleStartTimeChange}
+								startTime={form.startTime}
+								workingHoursEnd={selectedFacility?.workingHoursEnd}
+								workingHoursStart={selectedFacility?.workingHoursStart}
+							/>
 
 							{!isTimeRangeValid && form.startTime && form.endTime ? (
 								<Alert variant='destructive'>
-									End time must be after start time.
+									Start time must be in the future and end time must be after
+									start.
 								</Alert>
 							) : null}
 
-							{quoteQuery.isPending ? (
+							{isTimeRangeValid && conflictsQuery.isPending ? (
+								<LoadingOrError title='Checking conflicts' />
+							) : conflictsQuery.isError ? (
+								<LoadingOrError error={conflictsQuery.error} />
+							) : conflictsQuery.data && conflictsQuery.data.length > 0 ? (
+								<Alert variant='destructive'>
+									<div className='font-medium'>
+										Selected time is not available.
+									</div>
+									<div className='mt-1 text-sm'>
+										{conflictsQuery.data.length} conflicting booking
+										{conflictsQuery.data.length === 1 ? '' : 's'} found.
+									</div>
+								</Alert>
+							) : isTimeRangeValid && conflictsQuery.data ? (
+								<Alert variant='success'>Selected time is available.</Alert>
+							) : null}
+
+							{isTimeRangeValid && quoteQuery.isPending ? (
 								<LoadingOrError title='Calculating price' />
 							) : quoteQuery.isError ? (
 								<LoadingOrError error={quoteQuery.error} />
@@ -228,34 +304,43 @@ export function BookingPage() {
 										Quoted total: {formatCurrency(quoteQuery.data.totalPrice)}
 									</div>
 									<div className='mt-1 text-sm'>
-										{quoteQuery.data.hours} hours × multiplier{' '}
-										{quoteQuery.data.multiplier}
+										Duration: {formatDuration(quoteQuery.data.hours)}.
+									</div>
+									<div className='mt-1 text-sm'>
+										{formatRateSummary(quoteQuery.data.multiplier)}
 									</div>
 								</Alert>
 							) : null}
 
 							{selectedFacility ? (
-								<div className='rounded-xl border border-slate-800 bg-slate-900/50 p-4 text-sm text-slate-300'>
-									<div className='flex items-center justify-between'>
-										<span>Facility</span>
-										<span>{selectedFacility.name}</span>
-									</div>
-									<div className='mt-2 flex items-center justify-between'>
-										<span>Base price</span>
-										<span>{formatCurrency(selectedFacility.basePricePerHour)}/h</span>
-									</div>
-								</div>
+								<SelectedFacilitySummary facility={selectedFacility} />
 							) : null}
 
-							{errorMessage ? <Alert variant='destructive'>{errorMessage}</Alert> : null}
+							{hasSubmitted && bookingValidationErrors.length > 0 ? (
+								<Alert variant='destructive'>
+									<div className='font-medium'>Check booking details</div>
+									<ul className='mt-2 list-inside list-disc space-y-1'>
+										{bookingValidationErrors.map(error => (
+											<li key={error}>{error}</li>
+										))}
+									</ul>
+								</Alert>
+							) : null}
+
+							{errorMessage ? (
+								<Alert variant='destructive'>{errorMessage}</Alert>
+							) : null}
 
 							<Button
 								className='w-full'
 								disabled={
 									bookingMutation.isPending ||
+									conflictsQuery.isFetching ||
+									quoteQuery.isFetching ||
 									!selectedFacility ||
 									!quoteQuery.data ||
-									!isTimeRangeValid
+									!isTimeRangeValid ||
+									(conflictsQuery.data?.length ?? 0) > 0
 								}
 								size='lg'
 								type='submit'

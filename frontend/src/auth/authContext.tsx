@@ -7,14 +7,14 @@ import {
 	useState
 } from 'react'
 import {
-	SESSION_EVENT_NAME,
 	clearStoredSession,
 	createStoredSession,
 	getStoredSession,
 	isTimestampExpired,
+	SESSION_EVENT_NAME,
 	setStoredSession
 } from '@/auth/authStorage'
-import {requestJson, type ApiError, refreshSessionWithToken} from '@/lib/http'
+import {type ApiError, refreshSessionWithToken, requestJson} from '@/lib/http'
 import type {AuthResponse, StoredSession} from '@/types/api'
 
 interface AuthContextValue {
@@ -28,7 +28,9 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({children}: PropsWithChildren) {
-	const [session, setSession] = useState<StoredSession | null>(() => getStoredSession())
+	const [session, setSession] = useState<StoredSession | null>(() =>
+		getStoredSession()
+	)
 	const [isBootstrapping, setIsBootstrapping] = useState(true)
 
 	useEffect(() => {

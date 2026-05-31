@@ -3,7 +3,7 @@ import type {ButtonHTMLAttributes} from 'react'
 import {cn} from '@/lib/utils'
 
 const buttonVariants = cva(
-	'inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:pointer-events-none disabled:opacity-50',
+	'inline-flex min-w-0 items-center justify-center rounded-md text-center text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:pointer-events-none disabled:opacity-50',
 	{
 		defaultVariants: {
 			size: 'default',
@@ -30,12 +30,7 @@ export interface ButtonProps
 	extends ButtonHTMLAttributes<HTMLButtonElement>,
 		VariantProps<typeof buttonVariants> {}
 
-export function Button({
-	className,
-	size,
-	variant,
-	...props
-}: ButtonProps) {
+export function Button({className, size, variant, ...props}: ButtonProps) {
 	return (
 		<button
 			className={cn(buttonVariants({className, size, variant}))}
@@ -43,4 +38,3 @@ export function Button({
 		/>
 	)
 }
-

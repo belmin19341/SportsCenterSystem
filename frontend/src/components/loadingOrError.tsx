@@ -1,15 +1,18 @@
 import {Alert} from '@/components/ui/alert'
-import {getErrorMessage} from '@/lib/format'
+import {getErrorMessages} from '@/lib/format'
 
-export function LoadingOrError(props: {
-	error?: unknown
-	title?: string
-}) {
+export function LoadingOrError(props: {error?: unknown; title?: string}) {
 	if (props.error) {
+		const messages = getErrorMessages(props.error)
+
 		return (
 			<Alert variant='destructive'>
 				<div className='font-semibold'>Could not load data</div>
-				<div className='mt-1 text-sm'>{getErrorMessage(props.error)}</div>
+				<div className='mt-1 space-y-1 text-sm'>
+					{messages.map(message => (
+						<div key={message}>{message}</div>
+					))}
+				</div>
 			</Alert>
 		)
 	}
@@ -20,4 +23,3 @@ export function LoadingOrError(props: {
 		</div>
 	)
 }
-

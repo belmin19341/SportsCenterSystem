@@ -15,7 +15,7 @@ export function NotFoundPage() {
 				<CardHeader>
 					<CardTitle>Page not found</CardTitle>
 					<CardDescription>
-						The route does not exist in the first SportsCenter frontend slice.
+						We could not find that SportsCenter page.
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
@@ -27,4 +27,3 @@ export function NotFoundPage() {
 		</div>
 	)
 }
-
