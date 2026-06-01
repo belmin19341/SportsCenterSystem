@@ -2,6 +2,7 @@ import {
 	createContext,
 	type PropsWithChildren,
 	useContext,
+	useEffect,
 	useMemo,
 	useState
 } from 'react'
@@ -30,6 +31,7 @@ interface FeedbackContextValue {
 }
 
 const FeedbackContext = createContext<FeedbackContextValue | null>(null)
+const AUTO_DISMISS_DELAY_MS = 4500 // 4.5 seconds
 
 export function FeedbackProvider({children}: PropsWithChildren) {
 	const [message, setMessage] = useState<FeedbackMessage | null>(null)
@@ -61,6 +63,13 @@ export function FeedbackProvider({children}: PropsWithChildren) {
 
 export function FeedbackBanner() {
 	const {clearFeedback, message} = useFeedback()
+
+	useEffect(() => {
+		if (!message) return
+
+		const timeoutId = setTimeout(clearFeedback, AUTO_DISMISS_DELAY_MS)
+		return () => clearTimeout(timeoutId)
+	}, [message, clearFeedback])
 
 	if (!message) {
 		return null

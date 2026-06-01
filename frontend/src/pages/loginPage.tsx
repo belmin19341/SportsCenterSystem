@@ -1,5 +1,5 @@
 import {type FormEvent, useState} from 'react'
-import {Navigate, useLocation, useNavigate} from 'react-router'
+import {Link, Navigate, useLocation, useNavigate} from 'react-router'
 import {useAuth} from '@/auth/authContext'
 import {useFeedback} from '@/components/feedback'
 import {Alert} from '@/components/ui/alert'
@@ -107,6 +107,13 @@ export function LoginPage() {
 						>
 							{isSubmitting ? 'Signing in...' : 'Sign in'}
 						</Button>
+
+						<div className='text-center text-sm'>
+							<span className='text-slate-400'>Don't have an account? </span>
+							<Link className='text-sky-400 hover:underline' to='/register'>
+								Register here
+							</Link>
+						</div>
 
 						<p className='text-sm text-slate-400'>
 							Seed account: john_doe / password123

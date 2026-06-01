@@ -24,11 +24,11 @@ public class DataLoader implements CommandLineRunner {
     @Override
     public void run(String... args) {
         if (paymentRepository.count() > 0) {
-            log.info(">>> Podaci već postoje, preskačem DataLoader.");
+            log.info(">>> Data already exists, skipping DataLoader.");
             return;
         }
 
-        log.info(">>> Unosim početne podatke u Payment Service bazu...");
+        log.info(">>> Inserting initial data into Payment Service database...");
 
         // ── Payments ──
         Payment payment1 = paymentRepository.save(Payment.builder()
@@ -72,9 +72,9 @@ public class DataLoader implements CommandLineRunner {
         notificationRepository.save(Notification.builder()
                 .userId(3L)
                 .type(Notification.NotificationType.BOOKING_CONFIRMATION)
-                .subject("Rezervacija potvrđena")
-                .message("Vaša rezervacija za Mali teren A je potvrđena za " +
-                        LocalDateTime.now().plusDays(2).toLocalDate() + " u 18:00.")
+                .subject("Booking confirmed")
+                .message("Your booking for Small Court A is confirmed for " +
+                        LocalDateTime.now().plusDays(2).toLocalDate() + " at 18:00.")
                 .sentAt(LocalDateTime.now().minusHours(2))
                 .isRead(true)
                 .build());
@@ -82,8 +82,8 @@ public class DataLoader implements CommandLineRunner {
         notificationRepository.save(Notification.builder()
                 .userId(4L)
                 .type(Notification.NotificationType.GROUP_INVITE)
-                .subject("Poziv u grupu")
-                .message("Belmin vas poziva da se pridružite rezervaciji na Malom terenu A.")
+                .subject("Group Invitation")
+                .message("Belmin invited you to join a booking on Small Court A.")
                 .sentAt(LocalDateTime.now().minusHours(1))
                 .isRead(false)
                 .build());
@@ -91,8 +91,8 @@ public class DataLoader implements CommandLineRunner {
         notificationRepository.save(Notification.builder()
                 .userId(3L)
                 .type(Notification.NotificationType.ACHIEVEMENT_UNLOCKED)
-                .subject("Novi bedž!")
-                .message("Čestitamo! Otključali ste bedž 'Redovni igrač' 🏅")
+                .subject("New badge unlocked!")
+                .message("Congratulations! You've unlocked the 'Regular Player' badge 🏅")
                 .sentAt(LocalDateTime.now().minusDays(1))
                 .isRead(false)
                 .build());
@@ -100,8 +100,8 @@ public class DataLoader implements CommandLineRunner {
         notificationRepository.save(Notification.builder()
                 .userId(5L)
                 .type(Notification.NotificationType.PAYMENT_RECEIPT)
-                .subject("Potvrda plaćanja")
-                .message("Plaćanje od 35.00 KM za teniski teren je uspješno procesirano.")
+                .subject("Payment Receipt")
+                .message("Payment of 35.00 BAM for the tennis court was successfully processed.")
                 .sentAt(LocalDateTime.now().minusDays(5))
                 .isRead(true)
                 .build());
@@ -127,13 +127,12 @@ public class DataLoader implements CommandLineRunner {
         disputeRepository.save(Dispute.builder()
                 .bookingId(4L)
                 .reporterId(5L)
-                .description("Teren je bio mokar i klizav, nisu nam rekli da je bio poliven prije termina.")
+                .description("The court was wet and slippery; we weren't told it had been watered before the session.")
                 .status(Dispute.DisputeStatus.OPEN)
                 .build());
 
-        log.info(">>> Payment Service DataLoader završen — {} plaćanja, {} notifikacija, {} dokumenta, {} sporova.",
+        log.info(">>> Payment Service DataLoader finished — {} payments, {} notifications, {} documents, {} disputes.",
                 paymentRepository.count(), notificationRepository.count(),
                 documentRepository.count(), disputeRepository.count());
     }
 }
-

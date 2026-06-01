@@ -155,12 +155,20 @@ bash run-frontend.sh
 Skripta će automatski:
 - instalirati frontend dependencies ako `frontend/node_modules` ne postoji
 - pokrenuti Vite dev server na `http://localhost:5173`
-- koristiti `VITE_API_BASE_URL` iz root `.env` fajla (default: `http://localhost:8080`)
+- koristiti `VITE_API_BASE_URL` iz root `.env` fajla (obavezno)
 
 Važno:
 - frontend komunicira sa backendom preko **API Gateway-a** na `http://localhost:8080`
 - Gateway CORS sada koristi `FRONTEND_ALLOWED_ORIGINS` iz root `.env` fajla
 - prvi implementirani slice pokriva: public browsing, login, user dashboard i osnovni booking flow
+
+### 🏗️ Frontend Architecture (Smart/Dumb Pattern)
+
+To ensure maintainability (Issue #24), we follow the Smart/Dumb component pattern:
+
+1.  **Hooks (`src/hooks/`):** All `useQuery`, `useMutation`, and state management logic.
+2.  **Pages (`src/pages/` - Smart):** Orchestrate data via hooks and pass data to presentational components.
+3.  **Components (`src/components/` - Dumb):** Purely presentational JSX. They receive data via props and emit events via callbacks.
 
 ### 4. Verifikacija
 

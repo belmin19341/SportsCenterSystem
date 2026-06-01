@@ -2,6 +2,7 @@ package ba.nwt.userservice.controller;
 
 import ba.nwt.userservice.dto.AuthResponseDTO;
 import ba.nwt.userservice.dto.LoginRequestDTO;
+import ba.nwt.userservice.dto.RegisterRequestDTO;
 import ba.nwt.userservice.dto.RefreshTokenRequestDTO;
 import ba.nwt.userservice.service.AuthenticationService;
 import jakarta.validation.Valid;
@@ -18,6 +19,7 @@ import java.util.Map;
  * Endpoints:
  *   POST /api/auth/login    — exchange username+password for access + refresh tokens
  *   POST /api/auth/refresh  — exchange a valid refresh token for a new access token
+ *   POST /api/auth/register — register a new user and return JWT token
  *   POST /api/auth/logout   — revoke the bearer (and optional refresh) token
  *   POST /api/auth/validate — check whether a bearer token is still valid
  */
@@ -38,6 +40,18 @@ public class AuthenticationController {
     public ResponseEntity<AuthResponseDTO> login(@Valid @RequestBody LoginRequestDTO loginRequest) {
         AuthResponseDTO response = authenticationService.authenticate(loginRequest);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Register endpoint - create a new user and return JWT token for immediate login
+     *
+     * @param registerRequest User registration details (username, email, password)
+     * @return JWT token and user information
+     */
+    @PostMapping("/register")
+    public ResponseEntity<AuthResponseDTO> register(@Valid @RequestBody RegisterRequestDTO registerRequest) {
+        AuthResponseDTO response = authenticationService.register(registerRequest);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     /**

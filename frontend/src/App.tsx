@@ -12,6 +12,7 @@ import {FacilityPage} from '@/pages/facilityPage'
 import {HomePage} from '@/pages/homePage'
 import {LoginPage} from '@/pages/loginPage'
 import {NotFoundPage} from '@/pages/notFoundPage'
+import {RegisterPage} from '@/pages/registerPage'
 import {OwnerFacilitiesPage} from '@/pages/ownerFacilitiesPage'
 
 function renderError({error}: FallbackProps) {
@@ -32,6 +33,7 @@ export function App() {
 									path='/facilities/:facilityId'
 								/>
 								<Route element={<LoginPage />} path='/login' />
+								<Route element={<RegisterPage />} path='/register' />
 								<Route
 									element={
 										<ProtectedRoute>

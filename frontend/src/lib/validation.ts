@@ -62,6 +62,31 @@ export function validateLoginForm(input: {password: string; username: string}) {
 	return errors
 }
 
+export function validateRegisterForm(form: {
+	username?: string
+	email?: string
+	password?: string
+}) {
+	const errors: string[] = []
+
+	if (!form.username || form.username.trim().length < MIN_USERNAME_LENGTH) {
+		errors.push(`Username must be at least ${MIN_USERNAME_LENGTH} characters long.`)
+	} else if (form.username.length > 50) {
+		errors.push('Username cannot exceed 50 characters.')
+	}
+
+	const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+	if (!form.email || !emailRegex.test(form.email)) {
+		errors.push('Please enter a valid email address.')
+	}
+
+	if (!form.password || form.password.length < 8) {
+		errors.push('Password must be at least 8 characters long.')
+	}
+
+	return errors
+}
+
 export function validateBookingForm(input: BookingValidationInput) {
 	const errors: string[] = []
 	const start = getLocalDate(input.startTime)
@@ -117,6 +142,56 @@ export function validateBookingForm(input: BookingValidationInput) {
 
 	if (!input.quote || Number(input.quote.totalPrice) <= 0) {
 		errors.push('A valid price quote is required before booking.')
+	}
+
+	return errors
+}
+
+/**
+ * Validate only time-related constraints (before fetching price quote)
+ * Returns errors that prevent the quote API call
+ */
+export function validateBookingTimeOnly(
+	input: Omit<BookingValidationInput, 'quote'> & {facility: FacilityResponse | null | undefined}
+) {
+	const errors: string[] = []
+	const start = getLocalDate(input.startTime)
+	const end = getLocalDate(input.endTime)
+
+	if (!input.facility) {
+		return errors // Silent - not needed for quote validation
+	}
+
+	if (!start || !end) {
+		return errors // Silent - inputs not ready yet
+	}
+
+	if (start.valueOf() <= Date.now()) {
+		errors.push('Start time must be in the future.')
+	}
+
+	if (end.valueOf() <= start.valueOf()) {
+		errors.push('End time must be after start time.')
+	}
+
+	const open = getMinutes(input.facility.workingHoursStart)
+	const close = getMinutes(input.facility.workingHoursEnd)
+	const requestedStart = getDateTimeMinutes(input.startTime)
+	const requestedEnd = getDateTimeMinutes(input.endTime)
+
+	if (
+		open !== null &&
+		close !== null &&
+		requestedStart !== null &&
+		requestedEnd !== null &&
+		(requestedStart < open || requestedEnd > close)
+	) {
+		errors.push(
+			`Selected time must fit facility hours (${formatTimeRange(
+				input.facility.workingHoursStart,
+				input.facility.workingHoursEnd
+			)}).`
+		)
 	}
 
 	return errors

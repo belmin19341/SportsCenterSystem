@@ -2,7 +2,7 @@
 set -e
 
 # ═══════════════════════════════════════════════════════════════════
-# SportsCenterSystem — Pokretanje cijelog stack-a
+# SportsCenterSystem — Starting the entire stack
 #   1) Config Server (8888)
 #   2) Eureka Discovery (8761)
 #   3) 4 mikroservisa (User/Resource/Booking/Payment)
@@ -27,8 +27,8 @@ for arg in "$@"; do
             RESEED_DATA=true
             ;;
         *)
-            echo "❌ Nepoznata opcija: $arg"
-            echo "   Upotreba: bash run-services.sh [--lb] [--backend-only] [--reseed]"
+            echo "❌ Unknown option: $arg"
+            echo "   Usage: bash run-services.sh [--lb] [--backend-only] [--reseed]"
             exit 1
             ;;
     esac
@@ -39,9 +39,16 @@ if [ -f .env ]; then
     export JPA_HIBERNATE_DDL_AUTO=${JPA_HIBERNATE_DDL_AUTO:-update}
     export JPA_SHOW_SQL=${JPA_SHOW_SQL:-true}
     export JPA_FORMAT_SQL=${JPA_FORMAT_SQL:-true}
-    echo "✓ .env učitan"
+
+    if [ -z "$VITE_API_BASE_URL" ]; then
+        echo "❌ VITE_API_BASE_URL is not defined in .env."
+        echo "   This variable is mandatory for the frontend to communicate with the services."
+        exit 1
+    fi
+
+    echo "✓ .env loaded"
 else
-    echo "⚠️  .env fajl nije pronađen. Kopirajte .env.example u .env."
+    echo "⚠️  .env file not found. Please copy .env.example to .env."
     exit 1
 fi
 
@@ -65,7 +72,7 @@ GATEWAY_HEALTH_URL="http://localhost:$GATEWAY_PORT/actuator/health"
 
 wait_for_health() {
     local url=$1; local name=$2; local tries=60
-    echo -n "   čekam $name na $url ..."
+    echo -n "   waiting for $name at $url ..."
     for i in $(seq 1 $tries); do
         if curl -sf "$url" >/dev/null 2>&1; then echo " UP"; return 0; fi
         sleep 1; echo -n "."
@@ -85,7 +92,7 @@ docker_container_status() {
 
 wait_for_container() {
     local container=$1; local name=$2; local tries=${3:-120}
-    echo -n "   čekam $name ..."
+    echo -n "   waiting for $name ..."
     for i in $(seq 1 $tries); do
         local status
         status=$(docker_container_status "$container")
@@ -95,7 +102,7 @@ wait_for_container() {
                 return 0
                 ;;
             missing)
-                echo " ❌ container nije pronađen"
+                echo " ❌ container not found"
                 return 1
                 ;;
         esac
@@ -107,7 +114,7 @@ wait_for_container() {
 
 start_jar() {
     local label=$1; local jar=$2; local logfile=$3; shift 3
-    [ -f "$jar" ] || { echo "❌ JAR ne postoji: $jar"; exit 1; }
+    [ -f "$jar" ] || { echo "❌ JAR does not exist: $jar"; exit 1; }
     nohup java -jar "$jar" "$@" > "$logfile" 2>&1 &
     echo "   $label PID: $!"
 }
@@ -122,7 +129,7 @@ ensure_jar_service() {
     fi
 
     if is_healthy "$health_url"; then
-        echo "   $label već radi"
+        echo "   $label is already running"
         return 0
     fi
 
@@ -138,28 +145,28 @@ verify_reseed_seed_users() {
         "http://localhost:${USER_SERVICE_PORT:-8081}/api/auth/login")
 
     if [ "$status_code" != "200" ] || ! grep -q '"access_token"' "$response_file"; then
-        echo "❌ Reseed provjera nije uspjela — seed korisnik admin/password123 nije dostupan."
-        echo "   Odgovor user-service-a:"
+        echo "❌ Reseed check failed — seed user admin/password123 is not available."
+        echo "   User Service response:"
         cat "$response_file"
         rm -f "$response_file"
         exit 1
     fi
 
     rm -f "$response_file"
-    echo "✓ Seed korisnici su potvrđeni (admin/password123)"
+    echo "✓ Seed users verified (admin/password123)"
 }
 
 ensure_health_or_fail() {
     local url=$1; local name=$2; local logfile=$3
     wait_for_health "$url" "$name" || {
-        echo "❌ $name nije postao dostupan. Pogledajte log: $logfile"
+        echo "❌ $name did not become available. Check log: $logfile"
         exit 1
     }
 }
 
 require_command() {
     command -v "$1" >/dev/null 2>&1 || {
-        echo "❌ Nedostaje komanda: $1"
+        echo "❌ Missing command: $1"
         exit 1
     }
 }
@@ -172,19 +179,19 @@ stop_port_processes() {
 
     [ -n "$pids" ] || return 0
 
-    echo "🛑 Zaustavljam $label na portu $port..."
+    echo "🛑 Stopping $label on port $port..."
     for pid in $pids; do
         kill "$pid"
         while kill -0 "$pid" 2>/dev/null; do
             sleep 1
         done
-        echo "   ugašen PID: $pid"
+        echo "   killed PID: $pid"
     done
 }
 
 reset_local_state() {
     echo ""
-    echo "♻️  Resetujem lokalni stack i Docker volumene..."
+    echo "♻️  Resetting local stack and Docker volumes..."
 
     stop_port_processes "$FRONTEND_PORT" "frontend"
     stop_port_processes "$GATEWAY_PORT" "api-gateway"
@@ -207,7 +214,7 @@ reset_local_state() {
         /tmp/api-gateway.log \
         /tmp/frontend.log
 
-    echo "✓ Lokalni podaci i procesi su očišćeni"
+    echo "✓ Local data and processes cleared"
 }
 
 ensure_backend_artifacts() {
@@ -224,7 +231,7 @@ ensure_backend_artifacts() {
     for artifact in "${artifacts[@]}"; do
         if [ ! -f "$artifact" ]; then
             echo ""
-            echo "🔨 Nedostaju build artefakti — pokrećem bash build-all.sh --skip-frontend"
+            echo "🔨 Missing build artifacts — running bash build-all.sh --skip-frontend"
             bash build-all.sh --skip-frontend
             return
         fi
@@ -239,14 +246,14 @@ require_command lsof
 if [ "$RESEED_DATA" = true ]; then
     reset_local_state
     echo ""
-    echo "🔨 Reseed build — pokrećem bash build-all.sh --skip-frontend"
+    echo "🔨 Reseed build — running bash build-all.sh --skip-frontend"
     bash build-all.sh --skip-frontend
 else
     ensure_backend_artifacts
 fi
 
 echo ""
-echo "🐳 Podizanje/provjera Docker infrastrukture..."
+echo "🐳 Starting/checking Docker infrastructure..."
 docker compose up -d >/dev/null
 wait_for_container "sportcenter-user-db" "mysql-user"
 wait_for_container "sportcenter-resource-db" "mysql-resource"
@@ -265,7 +272,7 @@ ensure_jar_service "discovery-server" "$EUREKA_PORT" "$DISCOVERY_HEALTH_URL" "di
 ensure_health_or_fail "$DISCOVERY_HEALTH_URL" "discovery-server" "/tmp/discovery-server.log"
 
 echo ""
-echo "3️⃣  Mikroservisi..."
+echo "3️⃣  Microservices..."
 ensure_jar_service "user-service     (${USER_SERVICE_PORT:-8081})" "${USER_SERVICE_PORT:-8081}" "$USER_HEALTH_URL" "User Service/target/user-service-0.0.1-SNAPSHOT.jar" "/tmp/user-service.log" "$SPRING_JPA_DDL_ARG" "$SPRING_JPA_SHOW_SQL_ARG" "$SPRING_JPA_FORMAT_SQL_ARG"
 ensure_jar_service "resource-service (${RESOURCE_SERVICE_PORT:-8082})" "${RESOURCE_SERVICE_PORT:-8082}" "$RESOURCE_HEALTH_URL" "Resource Service/target/resource-service-0.0.1-SNAPSHOT.jar" "/tmp/resource-service.log" "$SPRING_JPA_DDL_ARG" "$SPRING_JPA_SHOW_SQL_ARG" "$SPRING_JPA_FORMAT_SQL_ARG"
 ensure_jar_service "booking-service  (${BOOKING_SERVICE_PORT:-8083})" "${BOOKING_SERVICE_PORT:-8083}" "$BOOKING_HEALTH_URL" "Booking Service/target/booking-service-0.0.1-SNAPSHOT.jar" "/tmp/booking-service.log" "$SPRING_JPA_DDL_ARG" "$SPRING_JPA_SHOW_SQL_ARG" "$SPRING_JPA_FORMAT_SQL_ARG"
@@ -283,7 +290,7 @@ ensure_health_or_fail "$GATEWAY_HEALTH_URL" "api-gateway" "/tmp/api-gateway.log"
 
 if [ "$RESEED_DATA" = true ]; then
     echo ""
-    echo "5️⃣  Provjera seed korisnika..."
+    echo "5️⃣  Seed user verification..."
     verify_reseed_seed_users
 fi
 
@@ -301,9 +308,9 @@ if [ "$START_LB" = true ]; then
     LB_HEALTH_URL="http://localhost:$LB_PORT/actuator/health"
     echo ""
     if is_healthy "$LB_HEALTH_URL"; then
-        echo "🧪 Druga instanca Resource Service-a ($LB_PORT) već radi"
+        echo "🧪 Second instance of Resource Service ($LB_PORT) is already running"
     else
-        echo "🧪 Druga instanca Resource Service-a ($LB_PORT) za LB demo..."
+        echo "🧪 Second instance of Resource Service ($LB_PORT) for LB demo..."
         SERVER_PORT=$LB_PORT \
         nohup java -jar "Resource Service/target/resource-service-0.0.1-SNAPSHOT.jar" \
             --server.port=$LB_PORT > /tmp/resource-service-2.log 2>&1 &
@@ -314,24 +321,24 @@ else
     LB_PORT=${RESOURCE_SERVICE_PORT_2:-8092}
     if lsof -ti tcp:"$LB_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
         echo ""
-        echo "🧪 Zaustavljam resource-service-2 ($LB_PORT) za single-instance režim..."
+        echo "🧪 Stopping resource-service-2 ($LB_PORT) for single-instance mode..."
         stop_port_processes "$LB_PORT" "resource-service-2"
     fi
 fi
 
 echo ""
 echo "═══════════════════════════════════════════════════════════════"
-echo "✓ Sve pokrenuto."
+echo "✓ Everything started."
 echo "  Eureka:    http://localhost:$EUREKA_PORT"
 echo "  Config:    http://localhost:$CONFIG_PORT/actuator/health"
 echo "  Gateway:   http://localhost:$GATEWAY_PORT/actuator/health"
 if [ "$START_FRONTEND" = true ]; then
     echo "  Frontend:  http://localhost:$FRONTEND_PORT"
 else
-    echo "  Frontend:  preskočen (--backend-only)"
+    echo "  Frontend:  skipped (--backend-only)"
 fi
 echo "  Swagger:   http://localhost:808X/swagger-ui.html"
-echo "  Logovi:    tail -f /tmp/<service>.log"
+echo "  Logs:      tail -f /tmp/<service>.log"
 if [ "$START_LB" = true ]; then
     echo "  LB mode:   2x resource-service (${RESOURCE_SERVICE_PORT:-8082}, ${RESOURCE_SERVICE_PORT_2:-8092})"
 else
