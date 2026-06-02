@@ -52,11 +52,9 @@ public class JwtTokenProvider {
 
     @PostConstruct
     public void init() {
-        log.info("Initializing JWT Provider. Checking for RSA keys...");
+        log.info("Initializing JWT Provider. Loading RSA keys from filesystem...");
         
-        // Osiguraj da ključevi postoje prije učitavanja
-        PemKeyLoader.ensureKeysExist(privateKeyPath, publicKeyPath);
-
+        // Load keys from filesystem (keys must already exist)
         this.privateKey = PemKeyLoader.loadPrivate(privateKeyPath);
         this.publicKey  = PemKeyLoader.loadPublic(publicKeyPath);
 

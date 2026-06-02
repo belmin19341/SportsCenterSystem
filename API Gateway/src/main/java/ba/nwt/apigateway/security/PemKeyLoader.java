@@ -1,12 +1,11 @@
 package ba.nwt.apigateway.security;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.DefaultResourceLoader;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.ResourceLoader;
 
-import java.io.InputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.security.KeyFactory;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.X509EncodedKeySpec;
@@ -15,55 +14,68 @@ import java.util.Base64;
 @Slf4j
 final class PemKeyLoader {
 
-    private static final ResourceLoader RESOURCE_LOADER =
-            new DefaultResourceLoader();
+    private PemKeyLoader() {}
 
-    private PemKeyLoader() {
-    }
-
+    /**
+     * Load RSA public key from filesystem.
+     * Fails startup with clear error if file does not exist.
+     */
     static RSAPublicKey loadPublic(String location) {
-
         try {
-
-            Resource resource =
-                    RESOURCE_LOADER.getResource(location);
-
-            if (!resource.exists()) {
-                throw new IllegalStateException(
-                        "RSA public key not found: " + location);
+            String filePath = stripScheme(location);
+            log.info("Loading JWT public key from: {}", filePath);
+            
+            // Validate file exists
+            if (!Files.exists(Paths.get(filePath))) {
+                String errorMsg = String.format(
+                    "FATAL: JWT public key not found at '%s'. " +
+                    "Please ensure the key exists at this filesystem path. " +
+                    "Do not use classpath: paths. Keys must be loaded from disk.",
+                    filePath
+                );
+                log.error(errorMsg);
+                throw new IllegalStateException(errorMsg);
             }
+            
+            byte[] der = readPemDer(filePath, "PUBLIC KEY");
+            RSAPublicKey publicKey = (RSAPublicKey) KeyFactory.getInstance("RSA")
+                    .generatePublic(new X509EncodedKeySpec(der));
 
-            try (InputStream in = resource.getInputStream()) {
-
-                String pem = new String(
-                        in.readAllBytes(),
-                        StandardCharsets.UTF_8);
-
-                String base64 = pem
-                        .replace("-----BEGIN PUBLIC KEY-----", "")
-                        .replace("-----END PUBLIC KEY-----", "")
-                        .replaceAll("\\s+", "");
-
-                byte[] der =
-                        Base64.getDecoder().decode(base64);
-
-                RSAPublicKey publicKey =
-                        (RSAPublicKey) KeyFactory
-                                .getInstance("RSA")
-                                .generatePublic(
-                                        new X509EncodedKeySpec(der));
-
-                log.info("RSA public key loaded successfully from {}",
-                        location);
-
-                return publicKey;
-            }
+            log.info("Successfully loaded JWT public key from: {}", filePath);
+            return publicKey;
 
         } catch (Exception e) {
-
-            throw new IllegalStateException(
-                    "Failed to load RSA public key from " + location,
-                    e);
+            String errorMsg = "Failed to load RSA public key from " + location;
+            log.error(errorMsg, e);
+            throw new IllegalStateException(errorMsg, e);
         }
+    }
+
+    /**
+     * Strip 'file:' or 'classpath:' prefix from location path.
+     */
+    private static String stripScheme(String location) {
+        if (location.startsWith("file:")) {
+            return location.substring(5);
+        }
+        if (location.startsWith("classpath:")) {
+            throw new IllegalStateException(
+                "FATAL: Classpath resource paths are not supported for JWT keys. " +
+                "Use 'file:' prefix or relative paths only. Got: " + location
+            );
+        }
+        return location;
+    }
+
+    /**
+     * Read PEM file and extract DER-encoded key bytes.
+     */
+    private static byte[] readPemDer(String filePath, String label) throws IOException {
+        String pem = new String(Files.readAllBytes(Paths.get(filePath)), StandardCharsets.UTF_8);
+        String base64 = pem
+                .replace("-----BEGIN " + label + "-----", "")
+                .replace("-----END " + label + "-----", "")
+                .replaceAll("\\s+", "");
+        return Base64.getDecoder().decode(base64);
     }
 }
