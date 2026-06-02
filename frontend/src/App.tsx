@@ -20,6 +20,14 @@ function renderError({error}: FallbackProps) {
 }
 
 export function App() {
+	// Issue #25: Validation to ensure VITE_API_BASE_URL is defined at runtime.
+	// This prevents the app from silently failing or using a wrong hardcoded fallback.
+	if (!import.meta.env.VITE_API_BASE_URL) {
+		throw new Error(
+			'VITE_API_BASE_URL is not defined. Please check your .env file and ensure it points to the API Gateway (typically http://localhost:8080).'
+		)
+	}
+
 	return (
 		<ErrorBoundary fallbackRender={renderError}>
 			<FeedbackProvider>

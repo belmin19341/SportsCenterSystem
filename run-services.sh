@@ -71,7 +71,7 @@ PAYMENT_HEALTH_URL="http://localhost:${PAYMENT_SERVICE_PORT:-8084}/actuator/heal
 GATEWAY_HEALTH_URL="http://localhost:$GATEWAY_PORT/actuator/health"
 
 wait_for_health() {
-    local url=$1; local name=$2; local tries=60
+    local url=$1; local name=$2; local tries=120
     echo -n "   waiting for $name at $url ..."
     for i in $(seq 1 $tries); do
         if curl -sf "$url" >/dev/null 2>&1; then echo " UP"; return 0; fi
@@ -174,8 +174,14 @@ require_command() {
 stop_port_processes() {
     local port=$1
     local label=$2
-    local pids
-    pids=$(lsof -ti tcp:"$port" -sTCP:LISTEN 2>/dev/null | sort -u | tr '\n' ' ')
+
+    local pids=""
+    if command -v lsof >/dev/null 2>&1; then
+        pids=$(lsof -ti tcp:"$port" -sTCP:LISTEN 2>/dev/null | sort -u | tr '\n' ' ')
+    elif [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+        # Windows fallback using netstat to find PID of process listening on the port
+        pids=$(netstat -ano | grep ":$port" | grep "LISTENING" | awk '{print $5}' | sort -u | tr '\n' ' ')
+    fi
 
     [ -n "$pids" ] || return 0
 
@@ -241,7 +247,6 @@ ensure_backend_artifacts() {
 require_command curl
 require_command docker
 require_command java
-require_command lsof
 
 if [ "$RESEED_DATA" = true ]; then
     reset_local_state
