@@ -1,62 +1,15 @@
-import {type FormEvent, useState} from 'react'
-import {Link, useNavigate} from 'react-router'
-import {useFeedback} from '@/components/feedback'
+import {Link} from 'react-router'
 import {Alert} from '@/components/ui/alert'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
+import {FieldError} from '@/components/ui/fieldError'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
-import {getErrorMessage} from '@/lib/format'
-import {validateRegisterForm} from '@/lib/validation'
+import {useRegisterForm} from '@/hooks/useRegisterForm'
 
 export function RegisterPage() {
-	const {showFeedback} = useFeedback()
-	const navigate = useNavigate()
-	const [errorMessage, setErrorMessage] = useState<string | null>(null)
-	const [isSubmitting, setIsSubmitting] = useState(false)
-	const [form, setForm] = useState({
-		username: '',
-		email: '',
-		password: '',
-		role: 'USER'
-	})
-
-	async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-		event.preventDefault()
-		setErrorMessage(null)
-
-		const validationErrors = validateRegisterForm(form)
-		if (validationErrors.length > 0) {
-			setErrorMessage(validationErrors.join(' '))
-			return
-		}
-
-		setIsSubmitting(true)
-
-		try {
-			const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/auth/register`, {
-				method: 'POST',
-				headers: {'Content-Type': 'application/json'},
-				body: JSON.stringify(form)
-			})
-
-			if (!response.ok) {
-				const errorData = await response.json().catch(() => ({}));
-				throw new Error(errorData.message || 'Registration failed. Username or email might be taken.')
-			}
-
-			showFeedback({
-				title: 'Account created',
-				description: 'You can now sign in with your credentials.',
-				variant: 'success'
-			})
-			navigate('/login')
-		} catch (error) {
-			setErrorMessage(getErrorMessage(error))
-		} finally {
-			setIsSubmitting(false)
-		}
-	}
+	const {apiError, fieldErrors, form, handleBlur, handleSubmit, isSubmitting, setForm} =
+		useRegisterForm()
 
 	return (
 		<div className='mx-auto w-full max-w-lg'>
@@ -67,47 +20,76 @@ export function RegisterPage() {
 				</CardHeader>
 				<CardContent>
 					<form className='space-y-5' onSubmit={handleSubmit}>
-						<div className='space-y-2'>
+						<div className='space-y-1'>
 							<Label htmlFor='username'>Username</Label>
 							<Input
 								autoComplete='username'
 								id='username'
+								isInvalid={fieldErrors.username !== null}
+								onBlur={() => handleBlur('username')}
 								onChange={e => setForm({...form, username: e.target.value})}
 								placeholder='johndoe'
-								required={true}
 								value={form.username}
 							/>
+							<FieldError message={fieldErrors.username} />
 						</div>
-						<div className='space-y-2'>
+
+						<div className='space-y-1'>
 							<Label htmlFor='email'>Email</Label>
 							<Input
 								autoComplete='email'
 								id='email'
+								isInvalid={fieldErrors.email !== null}
+								onBlur={() => handleBlur('email')}
 								onChange={e => setForm({...form, email: e.target.value})}
 								placeholder='john@example.com'
-								required={true}
 								type='email'
 								value={form.email}
 							/>
+							<FieldError message={fieldErrors.email} />
 						</div>
-						<div className='space-y-2'>
+
+						<div className='space-y-1'>
 							<Label htmlFor='password'>Password</Label>
 							<Input
 								autoComplete='new-password'
 								id='password'
+								isInvalid={fieldErrors.password !== null}
+								onBlur={() => handleBlur('password')}
 								onChange={e => setForm({...form, password: e.target.value})}
 								placeholder='••••••••'
-								required={true}
 								type='password'
 								value={form.password}
 							/>
+							<FieldError message={fieldErrors.password} />
 						</div>
-						{errorMessage && <Alert variant='destructive'>{errorMessage}</Alert>}
+
+						<div className='space-y-1'>
+							<Label htmlFor='confirmPassword'>Confirm password</Label>
+							<Input
+								autoComplete='new-password'
+								id='confirmPassword'
+								isInvalid={fieldErrors.confirmPassword !== null}
+								onBlur={() => handleBlur('confirmPassword')}
+								onChange={e => setForm({...form, confirmPassword: e.target.value})}
+								placeholder='••••••••'
+								type='password'
+								value={form.confirmPassword}
+							/>
+							<FieldError message={fieldErrors.confirmPassword} />
+						</div>
+
+						{apiError ? <Alert variant='destructive'>{apiError}</Alert> : null}
+
 						<Button className='w-full' disabled={isSubmitting} type='submit'>
 							{isSubmitting ? 'Creating account...' : 'Register'}
 						</Button>
+
 						<div className='text-center text-sm text-slate-400'>
-							Already have an account? <Link className='text-sky-400 hover:underline' to='/login'>Sign in</Link>
+							Already have an account?{' '}
+							<Link className='text-sky-400 hover:underline' to='/login'>
+								Sign in
+							</Link>
 						</div>
 					</form>
 				</CardContent>

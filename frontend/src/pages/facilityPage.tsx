@@ -12,6 +12,8 @@ import {
 	CardTitle
 } from '@/components/ui/card'
 import {Label} from '@/components/ui/label'
+
+const COMMENT_MAX = 1000
 import {formatPriceAdjustment} from '@/features/bookings/pricingCopy'
 import {formatCurrency, formatDateTime} from '@/lib/format'
 import {formatTimeRange} from '@/lib/localDateTime'
@@ -239,7 +241,14 @@ export function FacilityPage() {
 										</select>
 									</div>
 									<div className='space-y-2'>
-										<Label htmlFor='reviewComment'>Comment</Label>
+										<div className='flex items-center justify-between'>
+											<Label htmlFor='reviewComment'>Comment</Label>
+											<span
+												className={`text-xs ${reviewForm.comment.length > COMMENT_MAX ? 'text-rose-400' : 'text-slate-500'}`}
+											>
+												{reviewForm.comment.length}/{COMMENT_MAX}
+											</span>
+										</div>
 										<textarea
 											className='min-h-28 w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400'
 											id='reviewComment'
@@ -257,7 +266,10 @@ export function FacilityPage() {
 									) : null}
 									<Button
 										className='w-full sm:w-auto'
-										disabled={reviewMutation.isPending}
+										disabled={
+											reviewMutation.isPending ||
+											reviewForm.comment.length > COMMENT_MAX
+										}
 										type='submit'
 									>
 										{reviewMutation.isPending ? 'Saving...' : 'Submit review'}

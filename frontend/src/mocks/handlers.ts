@@ -22,7 +22,7 @@ const facilities = [
 		description: 'Outdoor football pitch for evening sessions.',
 		id: 2,
 		imageUrl: null,
-		name: 'Mali teren A',
+		name: 'Small Field A',
 		ownerId: 2,
 		status: 'ACTIVE',
 		type: 'FOOTBALL_5V5',

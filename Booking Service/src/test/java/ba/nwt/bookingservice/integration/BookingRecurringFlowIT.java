@@ -29,9 +29,9 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Flow: kreiranje recurring (ponavljajućih) rezervacija.
- * Testira tačan broj kreiranog, intervale između rezervacija,
- * isRecurring flag i prekid na konfliktu.
+ * Flow: creating recurring bookings.
+ * Tests the exact count created, intervals between bookings,
+ * isRecurring flag, and rollback on conflict.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
@@ -124,7 +124,7 @@ class BookingRecurringFlowIT {
     void recurringCreation_atomicallyRollsBack_whenConflictOccursOnLaterOccurrence() {
         LocalDateTime base = LocalDateTime.now().plusDays(18).withHour(10).withMinute(0).withSecond(0).withNano(0);
 
-        // Zauzmi treću sedmicu (occurrence index=2) za isti facility
+        // Book the third week (occurrence index=2) for the same facility
         restTemplate.postForObject("/api/bookings",
                 BookingRequestDTO.builder()
                         .userId(2L).facilityId(14L)
@@ -133,7 +133,7 @@ class BookingRecurringFlowIT {
                         .status(Booking.BookingStatus.PENDING).build(),
                 BookingResponseDTO.class);
 
-        // Pokušaj kreirati 4 weekly bookings — treća se sukobi s postojećom
+        // Try to create 4 weekly bookings — the third conflicts with the existing one
         String url = UriComponentsBuilder.fromPath("/api/bookings/recurring")
                 .queryParam("pattern", "WEEKLY").queryParam("occurrences", "4")
                 .toUriString();
@@ -145,7 +145,7 @@ class BookingRecurringFlowIT {
                 String.class);
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        // Samo originalni booking ostaje — rollback sprečio kreiranje recurring
+        // Only the original booking remains — rollback prevented recurring creation
         assertThat(bookingRepository.count()).isEqualTo(1);
     }
 }

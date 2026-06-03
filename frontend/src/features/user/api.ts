@@ -6,6 +6,19 @@ import type {
 	UserResponse
 } from '@/types/api'
 
+export function register(payload: {
+	email: string
+	password: string
+	role: string
+	username: string
+}) {
+	return requestJson<void>('/api/auth/register', {
+		auth: false,
+		body: payload,
+		method: 'POST'
+	})
+}
+
 export function getUser(userId: number) {
 	return requestJson<UserResponse>(`/api/users/${userId}`)
 }

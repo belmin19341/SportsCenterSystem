@@ -40,8 +40,8 @@ class AchievementServiceTest {
     void setUp() {
         achievement = Achievement.builder()
                 .id(1L)
-                .name("Prva rezervacija")
-                .description("Napravi svoju prvu rezervaciju")
+                .name("First Booking")
+                .description("Make your first booking")
                 .badgeIcon("🏅")
                 .category(Achievement.AchievementCategory.BOOKING)
                 .unlockCriteriaType("BOOKING_COUNT")
@@ -50,7 +50,7 @@ class AchievementServiceTest {
 
         responseDTO = AchievementResponseDTO.builder()
                 .id(1L)
-                .name("Prva rezervacija")
+                .name("First Booking")
                 .category(Achievement.AchievementCategory.BOOKING)
                 .build();
     }
@@ -63,7 +63,7 @@ class AchievementServiceTest {
         List<AchievementResponseDTO> result = achievementService.getAllAchievements();
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).getName()).isEqualTo("Prva rezervacija");
+        assertThat(result.get(0).getName()).isEqualTo("First Booking");
     }
 
     @Test
@@ -73,7 +73,7 @@ class AchievementServiceTest {
 
         AchievementResponseDTO result = achievementService.getAchievementById(1L);
 
-        assertThat(result.getName()).isEqualTo("Prva rezervacija");
+        assertThat(result.getName()).isEqualTo("First Booking");
     }
 
     @Test

@@ -32,7 +32,7 @@ root.render(
 			<BrowserRouter>
 				<App />
 			</BrowserRouter>
-			<ReactQueryDevtools initialIsOpen={false} />
+			{import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
 		</QueryClientProvider>
 	</StrictMode>
 )

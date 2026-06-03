@@ -71,7 +71,7 @@ PAYMENT_HEALTH_URL="http://localhost:${PAYMENT_SERVICE_PORT:-8084}/actuator/heal
 GATEWAY_HEALTH_URL="http://localhost:$GATEWAY_PORT/actuator/health"
 
 wait_for_health() {
-    local url=$1; local name=$2; local tries=120
+    local url=$1; local name=$2; local tries=60
     echo -n "   waiting for $name at $url ..."
     for i in $(seq 1 $tries); do
         if curl -sf "$url" >/dev/null 2>&1; then echo " UP"; return 0; fi
@@ -179,7 +179,6 @@ stop_port_processes() {
     if command -v lsof >/dev/null 2>&1; then
         pids=$(lsof -ti tcp:"$port" -sTCP:LISTEN 2>/dev/null | sort -u | tr '\n' ' ')
     elif [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
-        # Windows fallback using netstat to find PID of process listening on the port
         pids=$(netstat -ano | grep ":$port" | grep "LISTENING" | awk '{print $5}' | sort -u | tr '\n' ' ')
     fi
 
@@ -187,10 +186,18 @@ stop_port_processes() {
 
     echo "🛑 Stopping $label on port $port..."
     for pid in $pids; do
-        kill "$pid"
-        while kill -0 "$pid" 2>/dev/null; do
-            sleep 1
-        done
+        if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+            taskkill //F //PID "$pid" >/dev/null 2>&1 || true
+            # Wait until the process is gone (tasklist returns non-zero when PID missing)
+            while tasklist //FI "PID eq $pid" 2>/dev/null | grep -q "^java"; do
+                sleep 1
+            done
+        else
+            kill "$pid" 2>/dev/null || true
+            while kill -0 "$pid" 2>/dev/null; do
+                sleep 1
+            done
+        fi
         echo "   killed PID: $pid"
     done
 }
@@ -324,7 +331,14 @@ if [ "$START_LB" = true ]; then
     fi
 else
     LB_PORT=${RESOURCE_SERVICE_PORT_2:-8092}
-    if lsof -ti tcp:"$LB_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+    # Cross-platform check whether LB port is in use
+    _lb_pids=""
+    if command -v lsof >/dev/null 2>&1; then
+        _lb_pids=$(lsof -ti tcp:"$LB_PORT" -sTCP:LISTEN 2>/dev/null || true)
+    elif [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+        _lb_pids=$(netstat -ano | grep ":$LB_PORT" | grep "LISTENING" | awk '{print $5}' | sort -u | tr '\n' ' ' 2>/dev/null || true)
+    fi
+    if [ -n "$_lb_pids" ]; then
         echo ""
         echo "🧪 Stopping resource-service-2 ($LB_PORT) for single-instance mode..."
         stop_port_processes "$LB_PORT" "resource-service-2"

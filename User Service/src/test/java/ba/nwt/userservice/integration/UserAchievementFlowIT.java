@@ -28,9 +28,9 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Flow: dodjela achievementa korisniku.
- * Testira kompletan tok: kreiranje korisnika + achievementa,
- * dodjela, provjera vidljivosti u profilu, brisanje dodjele.
+ * Flow: assigning achievements to users.
+ * Tests the full flow: user + achievement creation,
+ * assignment, visibility in profile, and deletion.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
@@ -84,7 +84,7 @@ class UserAchievementFlowIT {
     @Test
     void assignAchievement_shouldAppearInUsersAchievementList() {
         UserResponseDTO user = createUser("ivan", "ivan@example.com");
-        AchievementResponseDTO ach = createAchievement("Prva rezervacija");
+        AchievementResponseDTO ach = createAchievement("First Booking");
 
         assignAchievement(user.getId(), ach.getId());
 
@@ -93,16 +93,16 @@ class UserAchievementFlowIT {
         assertThat(achievements).hasSize(1);
         assertThat(achievements.get(0).getUserId()).isEqualTo(user.getId());
         assertThat(achievements.get(0).getAchievementId()).isEqualTo(ach.getId());
-        assertThat(achievements.get(0).getAchievementName()).isEqualTo("Prva rezervacija");
+        assertThat(achievements.get(0).getAchievementName()).isEqualTo("First Booking");
         assertThat(achievements.get(0).getUnlockedAt()).isNotNull();
     }
 
     @Test
     void assignMultipleAchievements_allVisibleForUser() {
         UserResponseDTO user = createUser("marko", "marko@example.com");
-        AchievementResponseDTO ach1 = createAchievement("10 rezervacija");
-        AchievementResponseDTO ach2 = createAchievement("Redovni igrač");
-        AchievementResponseDTO ach3 = createAchievement("Oprema spremna");
+        AchievementResponseDTO ach1 = createAchievement("10 Bookings");
+        AchievementResponseDTO ach2 = createAchievement("Regular Player");
+        AchievementResponseDTO ach3 = createAchievement("Gear Up");
 
         assignAchievement(user.getId(), ach1.getId());
         assignAchievement(user.getId(), ach2.getId());
@@ -112,7 +112,7 @@ class UserAchievementFlowIT {
 
         assertThat(achievements).hasSize(3);
         assertThat(achievements).extracting(UserAchievementResponseDTO::getAchievementName)
-                .containsExactlyInAnyOrder("10 rezervacija", "Redovni igrač", "Oprema spremna");
+                .containsExactlyInAnyOrder("10 Bookings", "Regular Player", "Gear Up");
     }
 
     @Test
@@ -142,7 +142,7 @@ class UserAchievementFlowIT {
 
         assertThat(getAchievementsForUser(user1.getId())).hasSize(1);
         assertThat(getAchievementsForUser(user2.getId())).hasSize(1);
-        // Svaki ima svoju instancu dodjele
+        // Each user has their own assignment instance
         assertThat(userAchievementRepository.count()).isEqualTo(2);
     }
 

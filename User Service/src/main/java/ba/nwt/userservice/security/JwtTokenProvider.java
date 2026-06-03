@@ -26,10 +26,10 @@ public class JwtTokenProvider {
     public static final String TYPE_ACCESS = "access";
     public static final String TYPE_REFRESH = "refresh";
 
-    @Value("${jwt.private-key-path:file:./keys/jwt-private.pem}")
+    @Value("${jwt.private-key-path:classpath:keys/jwt-private.pem}")
     private String privateKeyPath;
 
-    @Value("${jwt.public-key-path:file:./keys/jwt-public.pem}")
+    @Value("${jwt.public-key-path:classpath:keys/jwt-public.pem}")
     private String publicKeyPath;
 
     @Value("${jwt.issuer}")

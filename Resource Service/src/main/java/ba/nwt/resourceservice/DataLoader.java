@@ -23,20 +23,20 @@ public class DataLoader implements CommandLineRunner {
     @Override
     public void run(String... args) {
         if (facilityRepository.count() > 0) {
-            log.info(">>> Podaci već postoje, preskačem DataLoader.");
+            log.info(">>> Data already exists, skipping DataLoader.");
             return;
         }
 
-        log.info(">>> Unosim početne podatke u Resource Service bazu...");
+        log.info(">>> Inserting initial data into Resource Service database...");
 
-        // ── Tereni ──
+        // ── Facilities ──
         Facility football5 = facilityRepository.save(Facility.builder()
                 .ownerId(2L)
-                .name("Mali teren A")
+                .name("Small Field A")
                 .type(Facility.FacilityType.FOOTBALL_5V5)
                 .capacity(10)
                 .basePricePerHour(new BigDecimal("60.00"))
-                .description("Mali fudbalski teren sa umjetnom travom, osvjetljenje")
+                .description("Small 5v5 football field with artificial turf and floodlights")
                 .workingHoursStart(LocalTime.of(8, 0))
                 .workingHoursEnd(LocalTime.of(23, 0))
                 .status(Facility.FacilityStatus.ACTIVE)
@@ -44,11 +44,11 @@ public class DataLoader implements CommandLineRunner {
 
         Facility football7 = facilityRepository.save(Facility.builder()
                 .ownerId(2L)
-                .name("Veliki teren B")
+                .name("Large Field B")
                 .type(Facility.FacilityType.FOOTBALL_7V7)
                 .capacity(14)
                 .basePricePerHour(new BigDecimal("100.00"))
-                .description("Veliki fudbalski teren 7v7 sa tribinama")
+                .description("Large 7v7 football field with stands")
                 .workingHoursStart(LocalTime.of(9, 0))
                 .workingHoursEnd(LocalTime.of(22, 0))
                 .status(Facility.FacilityStatus.ACTIVE)
@@ -60,7 +60,7 @@ public class DataLoader implements CommandLineRunner {
                 .type(Facility.FacilityType.PADEL)
                 .capacity(4)
                 .basePricePerHour(new BigDecimal("40.00"))
-                .description("Indoor padel teren sa LED osvjetljenjem")
+                .description("Indoor padel court with LED lighting")
                 .workingHoursStart(LocalTime.of(7, 0))
                 .workingHoursEnd(LocalTime.of(22, 0))
                 .status(Facility.FacilityStatus.ACTIVE)
@@ -68,22 +68,22 @@ public class DataLoader implements CommandLineRunner {
 
         Facility tennis = facilityRepository.save(Facility.builder()
                 .ownerId(2L)
-                .name("Teniski teren 1")
+                .name("Tennis Court 1")
                 .type(Facility.FacilityType.TENNIS)
                 .capacity(4)
                 .basePricePerHour(new BigDecimal("35.00"))
-                .description("Outdoor teniski teren — zemlja")
+                .description("Outdoor clay tennis court")
                 .workingHoursStart(LocalTime.of(7, 0))
                 .workingHoursEnd(LocalTime.of(21, 0))
                 .status(Facility.FacilityStatus.ACTIVE)
                 .build());
 
-        // ── Oprema ──
+        // ── Equipment ──
         equipmentRepository.save(Equipment.builder()
                 .facility(football5)
-                .name("Nike Fudbalska lopta")
+                .name("Nike Football")
                 .type(Equipment.EquipmentType.BALL)
-                .category("Fudbal")
+                .category("Football")
                 .quantityTotal(10)
                 .quantityAvailable(8)
                 .pricePerDay(new BigDecimal("5.00"))
@@ -94,7 +94,7 @@ public class DataLoader implements CommandLineRunner {
 
         equipmentRepository.save(Equipment.builder()
                 .facility(padel)
-                .name("Bullpadel Vertex reket")
+                .name("Bullpadel Vertex Racket")
                 .type(Equipment.EquipmentType.RACKET)
                 .category("Padel")
                 .quantityTotal(6)
@@ -108,9 +108,9 @@ public class DataLoader implements CommandLineRunner {
 
         equipmentRepository.save(Equipment.builder()
                 .facility(tennis)
-                .name("Wilson teniski reket")
+                .name("Wilson Tennis Racket")
                 .type(Equipment.EquipmentType.RACKET)
-                .category("Tenis")
+                .category("Tennis")
                 .quantityTotal(8)
                 .quantityAvailable(6)
                 .pricePerDay(new BigDecimal("10.00"))
@@ -120,7 +120,7 @@ public class DataLoader implements CommandLineRunner {
                 .build());
 
         equipmentRepository.save(Equipment.builder()
-                .name("Sobni bicikl")
+                .name("Stationary Bike")
                 .type(Equipment.EquipmentType.BICYCLE)
                 .category("Fitness")
                 .quantityTotal(5)
@@ -138,7 +138,7 @@ public class DataLoader implements CommandLineRunner {
                 .timeSlotEnd(LocalTime.of(22, 0))
                 .dayOfWeek(PricingRule.DayOfWeekEnum.SATURDAY)
                 .priceMultiplier(new BigDecimal("1.50"))
-                .description("Vikend večernji termin — 50% premija")
+                .description("Weekend evening slot — 50% surcharge")
                 .build());
 
         pricingRuleRepository.save(PricingRule.builder()
@@ -146,7 +146,7 @@ public class DataLoader implements CommandLineRunner {
                 .timeSlotStart(LocalTime.of(8, 0))
                 .timeSlotEnd(LocalTime.of(14, 0))
                 .priceMultiplier(new BigDecimal("0.80"))
-                .description("Jutarnji popust — 20% manje")
+                .description("Morning discount — 20% off")
                 .build());
 
         pricingRuleRepository.save(PricingRule.builder()
@@ -155,11 +155,10 @@ public class DataLoader implements CommandLineRunner {
                 .timeSlotEnd(LocalTime.of(21, 0))
                 .dayOfWeek(PricingRule.DayOfWeekEnum.SUNDAY)
                 .priceMultiplier(new BigDecimal("1.30"))
-                .description("Nedjeljni popodnevni slot — 30% premija")
+                .description("Sunday afternoon slot — 30% surcharge")
                 .build());
 
-        log.info(">>> Resource Service DataLoader završen — {} terena, {} oprema, {} pricing pravila.",
+        log.info(">>> Resource Service DataLoader finished — {} facilities, {} equipment items, {} pricing rules.",
                 facilityRepository.count(), equipmentRepository.count(), pricingRuleRepository.count());
     }
 }
-

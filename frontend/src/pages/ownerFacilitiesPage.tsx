@@ -11,11 +11,14 @@ import {
 	CardTitle
 } from '@/components/ui/card'
 import {DateTimePicker} from '@/components/ui/dateTimePicker'
+import {FieldError} from '@/components/ui/fieldError'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {formatCurrency} from '@/lib/format'
 import {formatTimeRange} from '@/lib/localDateTime'
-import type {FacilityRequest, FacilityStatus, FacilityType} from '@/types/api'
+import type {FacilityStatus, FacilityType} from '@/types/api'
+
+const DESCRIPTION_MAX = 500
 
 const facilityTypes = [
 	'FOOTBALL_5V5',
@@ -39,53 +42,81 @@ export function OwnerFacilitiesPage() {
 	const {
 		session,
 		facilitiesQuery,
-		createMutation,
-		form,
-		setForm,
-		errorMessage,
-		handleSubmit
-	} = useOwnerFacilitiesData();
+		activeForm,
+		setActiveForm,
+		activeFieldErrors,
+		activeApiError,
+		isSubmitting,
+		isEditing,
+		editingFacility,
+		handleBlur,
+		handleSubmit,
+		handleStartEdit,
+		handleCancelEdit
+	} = useOwnerFacilitiesData()
 
 	if (!session) {
 		return null
 	}
 
+	const descriptionLength = (activeForm.description ?? '').length
+
 	return (
 		<div className='grid gap-6 xl:grid-cols-[0.9fr,1.1fr]'>
 			<Card>
 				<CardHeader>
-					<CardTitle>Create facility</CardTitle>
-					<CardDescription>
-						Owner-managed courts use the signed-in user ID.
-					</CardDescription>
+					<div className='flex items-center justify-between gap-2'>
+						<div>
+							<CardTitle>
+								{isEditing ? `Editing: ${editingFacility?.name}` : 'Create facility'}
+							</CardTitle>
+							<CardDescription>
+								{isEditing
+									? 'Update the facility details below.'
+									: 'Owner-managed courts use the signed-in user ID.'}
+							</CardDescription>
+						</div>
+						{isEditing && (
+							<Button
+								onClick={handleCancelEdit}
+								size='sm'
+								type='button'
+								variant='outline'
+							>
+								Cancel
+							</Button>
+						)}
+					</div>
 				</CardHeader>
 				<CardContent>
 					<form className='space-y-5' onSubmit={handleSubmit}>
-						<div className='space-y-2'>
+						<div className='space-y-1'>
 							<Label htmlFor='facilityName'>Name</Label>
 							<Input
 								id='facilityName'
+								isInvalid={activeFieldErrors.name !== null}
+								onBlur={() => handleBlur('name')}
 								onChange={event =>
-									setForm(current => ({...current, name: event.target.value}))
+									setActiveForm(current => ({...current, name: event.target.value}))
 								}
-								required={true}
-								value={form.name}
+								value={activeForm.name}
 							/>
+							<FieldError message={activeFieldErrors.name} />
 						</div>
 
 						<div className='grid gap-4 sm:grid-cols-2'>
-							<div className='space-y-2'>
+							<div className='space-y-1'>
 								<Label htmlFor='facilityType'>Type</Label>
 								<select
 									className='flex h-11 w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400'
 									id='facilityType'
 									onChange={event =>
-										setForm(current => ({
+										setActiveForm(current => ({
 											...current,
 											type: event.target.value as FacilityType
 										}))
 									}
-									value={form.type}
+									value={activeForm.type}
 								>
 									{facilityTypes.map(type => (
 										<option key={type} value={type}>
@@ -94,18 +125,18 @@ export function OwnerFacilitiesPage() {
 									))}
 								</select>
 							</div>
-							<div className='space-y-2'>
+							<div className='space-y-1'>
 								<Label htmlFor='facilityStatus'>Status</Label>
 								<select
 									className='flex h-11 w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400'
 									id='facilityStatus'
 									onChange={event =>
-										setForm(current => ({
+										setActiveForm(current => ({
 											...current,
 											status: event.target.value as FacilityStatus
 										}))
 									}
-									value={form.status}
+									value={activeForm.status}
 								>
 									{facilityStatuses.map(status => (
 										<option key={status} value={status}>
@@ -117,103 +148,128 @@ export function OwnerFacilitiesPage() {
 						</div>
 
 						<div className='grid gap-4 sm:grid-cols-2'>
-							<div className='space-y-2'>
+							<div className='space-y-1'>
 								<Label htmlFor='capacity'>Capacity</Label>
 								<Input
 									id='capacity'
+									isInvalid={activeFieldErrors.capacity !== null}
 									min={1}
+									onBlur={() => handleBlur('capacity')}
 									onChange={event =>
-										setForm(current => ({
+										setActiveForm(current => ({
 											...current,
 											capacity: Number(event.target.value)
 										}))
 									}
-									required={true}
 									type='number'
-									value={form.capacity}
+									value={activeForm.capacity}
 								/>
+								<FieldError message={activeFieldErrors.capacity} />
 							</div>
-							<div className='space-y-2'>
+							<div className='space-y-1'>
 								<Label htmlFor='basePrice'>Base price per hour</Label>
 								<Input
 									id='basePrice'
+									isInvalid={activeFieldErrors.basePricePerHour !== null}
 									min={0.01}
+									onBlur={() => handleBlur('basePricePerHour')}
 									onChange={event =>
-										setForm(current => ({
+										setActiveForm(current => ({
 											...current,
 											basePricePerHour: Number(event.target.value)
 										}))
 									}
-									required={true}
 									step={0.01}
 									type='number'
-									value={form.basePricePerHour}
+									value={activeForm.basePricePerHour}
 								/>
+								<FieldError message={activeFieldErrors.basePricePerHour} />
 							</div>
 						</div>
 
 						<div className='grid gap-4 sm:grid-cols-2'>
-							<div className='space-y-2'>
+							<div className='space-y-1'>
 								<Label htmlFor='hoursStart'>Opens</Label>
 								<DateTimePicker
 									caption='Shown as the first available booking time.'
 									id='hoursStart'
 									mode='time'
 									onChange={nextValue =>
-										setForm(current => ({
+										setActiveForm(current => ({
 											...current,
 											workingHoursStart: nextValue
 										}))
 									}
 									placeholder='Choose the opening time'
 									quickStepMinutes={60}
-									value={form.workingHoursStart}
+									value={activeForm.workingHoursStart}
 								/>
 							</div>
-							<div className='space-y-2'>
+							<div className='space-y-1'>
 								<Label htmlFor='hoursEnd'>Closes</Label>
 								<DateTimePicker
 									caption='Shown as the last available booking time.'
 									id='hoursEnd'
 									mode='time'
 									onChange={nextValue =>
-										setForm(current => ({
+										setActiveForm(current => ({
 											...current,
 											workingHoursEnd: nextValue
 										}))
 									}
 									placeholder='Choose the closing time'
 									quickStepMinutes={60}
-									value={form.workingHoursEnd}
+									value={activeForm.workingHoursEnd}
 								/>
 							</div>
 						</div>
+						{activeFieldErrors.workingHours ? (
+							<FieldError message={activeFieldErrors.workingHours} />
+						) : null}
 
-						<div className='space-y-2'>
-							<Label htmlFor='description'>Description</Label>
+						<div className='space-y-1'>
+							<div className='flex items-center justify-between'>
+								<Label htmlFor='description'>Description</Label>
+								<span
+									className={`text-xs ${descriptionLength > DESCRIPTION_MAX ? 'text-rose-400' : 'text-slate-500'}`}
+								>
+									{descriptionLength}/{DESCRIPTION_MAX}
+								</span>
+							</div>
 							<textarea
 								className='min-h-24 w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400'
 								id='description'
 								onChange={event =>
-									setForm(current => ({
+									setActiveForm(current => ({
 										...current,
 										description: event.target.value
 									}))
 								}
-								value={form.description || ''}
+								value={activeForm.description ?? ''}
 							/>
+							{descriptionLength > DESCRIPTION_MAX ? (
+								<FieldError
+									message={`Description must be at most ${DESCRIPTION_MAX} characters.`}
+								/>
+							) : null}
 						</div>
 
-						{errorMessage ? (
-							<Alert variant='destructive'>{errorMessage}</Alert>
+						{activeApiError ? (
+							<Alert variant='destructive'>{activeApiError}</Alert>
 						) : null}
 
 						<Button
 							className='w-full'
-							disabled={createMutation.isPending}
+							disabled={isSubmitting || descriptionLength > DESCRIPTION_MAX}
 							type='submit'
 						>
-							{createMutation.isPending ? 'Creating...' : 'Create facility'}
+							{isSubmitting
+								? isEditing
+									? 'Saving...'
+									: 'Creating...'
+								: isEditing
+									? 'Save changes'
+									: 'Create facility'}
 						</Button>
 					</form>
 				</CardContent>
@@ -235,7 +291,7 @@ export function OwnerFacilitiesPage() {
 						<div className='space-y-3'>
 							{facilitiesQuery.data.map(facility => (
 								<div
-									className='rounded-lg border border-slate-800 bg-slate-900/50 p-4 text-sm text-slate-300'
+									className={`rounded-lg border bg-slate-900/50 p-4 text-sm text-slate-300 transition-colors ${editingFacility?.id === facility.id ? 'border-sky-500/40' : 'border-slate-800'}`}
 									key={facility.id}
 								>
 									<div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
@@ -250,7 +306,7 @@ export function OwnerFacilitiesPage() {
 												)}
 											</div>
 										</div>
-										<div className='flex flex-wrap gap-2 sm:justify-end'>
+										<div className='flex flex-wrap items-center gap-2'>
 											<Badge>{humanizeLabel(facility.type)}</Badge>
 											<Badge
 												variant={
@@ -262,6 +318,18 @@ export function OwnerFacilitiesPage() {
 											<Badge variant='muted'>
 												{formatCurrency(facility.basePricePerHour)}/h
 											</Badge>
+											{(session.role === 'ADMIN' ||
+												facility.ownerId === session.userId) && (
+												<Button
+													disabled={isSubmitting}
+													onClick={() => handleStartEdit(facility)}
+													size='sm'
+													type='button'
+													variant='outline'
+												>
+													Edit
+												</Button>
+											)}
 										</div>
 									</div>
 								</div>

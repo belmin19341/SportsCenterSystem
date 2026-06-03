@@ -19,7 +19,7 @@ import java.nio.file.Paths;
 @Slf4j
 public class JwtKeyValidation implements ApplicationRunner {
 
-    @Value("${jwt.public-key-path:file:./keys/jwt-public.pem}")
+    @Value("${jwt.public-key-path:classpath:keys/jwt-public.pem}")
     private String publicKeyPath;
 
     @Override
@@ -36,8 +36,19 @@ public class JwtKeyValidation implements ApplicationRunner {
     }
 
     private void validateKeyExists(String keyPath) {
+        if (keyPath != null && keyPath.startsWith("classpath:")) {
+            validateClasspathKey(keyPath);
+            return;
+        }
+
         String filePath = stripScheme(keyPath);
-        boolean exists = Files.exists(Paths.get(filePath));
+        boolean exists;
+        try {
+            exists = Files.exists(Paths.get(filePath));
+        } catch (Exception e) {
+            log.error("FATAL: JWT public key path is invalid: '{}' — {}", filePath, e.getMessage());
+            throw new IllegalStateException("JWT public key path is invalid: " + filePath, e);
+        }
 
         if (!exists) {
             String errorMsg = String.format(
@@ -66,7 +77,24 @@ public class JwtKeyValidation implements ApplicationRunner {
         log.info("✓ JWT public key found at: {}", filePath);
     }
 
+    private void validateClasspathKey(String keyPath) {
+        String resourcePath = keyPath.substring("classpath:".length());
+        try (var in = getClass().getClassLoader().getResourceAsStream(resourcePath)) {
+            if (in == null) {
+                log.error("FATAL: JWT public key not found on classpath: {}", resourcePath);
+                throw new IllegalStateException("JWT public key not found on classpath: " + resourcePath);
+            }
+        } catch (IllegalStateException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("FATAL: Could not read JWT public key from classpath: {}", resourcePath, e);
+            throw new IllegalStateException("JWT public key unreadable on classpath: " + resourcePath, e);
+        }
+        log.info("✓ JWT public key found on classpath: {}", resourcePath);
+    }
+
     private static String stripScheme(String location) {
+        if (location == null) return "";
         if (location.startsWith("file:")) {
             return location.substring(5);
         }

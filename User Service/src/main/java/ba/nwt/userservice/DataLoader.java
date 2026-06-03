@@ -24,13 +24,13 @@ public class DataLoader implements CommandLineRunner {
     @Override
     public void run(String... args) {
         if (userRepository.count() > 0) {
-            log.info(">>> Podaci već postoje, preskačem DataLoader.");
+            log.info(">>> Data already exists, skipping DataLoader.");
             return;
         }
 
-        log.info(">>> Unosim početne podatke u User Service bazu...");
+        log.info(">>> Inserting initial data into User Service database...");
 
-        // ── Test korisnik za JWT autentifikaciju ──
+        // ── Seed user for JWT authentication testing ──
         User testUser = userRepository.save(User.builder()
                 .username("john_doe")
                 .email("john@example.com")
@@ -39,7 +39,7 @@ public class DataLoader implements CommandLineRunner {
                 .phone("+38761234567")
                 .build());
 
-        // ── Korisnici ──
+        // ── Users ──
         User admin = userRepository.save(User.builder()
                 .username("admin")
                 .email("admin@sportcenter.ba")
@@ -49,8 +49,8 @@ public class DataLoader implements CommandLineRunner {
                 .build());
 
         User owner = userRepository.save(User.builder()
-                .username("vlasnik_teren")
-                .email("vlasnik@sportcenter.ba")
+                .username("court_owner")
+                .email("owner@sportcenter.ba")
                 .passwordHash(passwordEncoder.encode("password123"))
                 .role(User.Role.OWNER)
                 .phone("+38761000002")
@@ -92,8 +92,8 @@ public class DataLoader implements CommandLineRunner {
 
         // ── Achievements ──
         Achievement firstBooking = achievementRepository.save(Achievement.builder()
-                .name("Prva rezervacija")
-                .description("Napravi svoju prvu rezervaciju terena")
+                .name("First Booking")
+                .description("Make your first court booking")
                 .badgeIcon("🏅")
                 .category(Achievement.AchievementCategory.BOOKING)
                 .unlockCriteriaType("BOOKING_COUNT")
@@ -101,8 +101,8 @@ public class DataLoader implements CommandLineRunner {
                 .build());
 
         Achievement tenBookings = achievementRepository.save(Achievement.builder()
-                .name("Redovni igrač")
-                .description("Napravi 10 rezervacija")
+                .name("Regular Player")
+                .description("Make 10 bookings")
                 .badgeIcon("⭐")
                 .category(Achievement.AchievementCategory.MILESTONE)
                 .unlockCriteriaType("BOOKING_COUNT")
@@ -110,8 +110,8 @@ public class DataLoader implements CommandLineRunner {
                 .build());
 
         Achievement firstRental = achievementRepository.save(Achievement.builder()
-                .name("Oprema spremna")
-                .description("Iznajmi opremu prvi put")
+                .name("Gear Up")
+                .description("Rent equipment for the first time")
                 .badgeIcon("🎾")
                 .category(Achievement.AchievementCategory.RENTAL)
                 .unlockCriteriaType("RENTAL_COUNT")
@@ -128,8 +128,7 @@ public class DataLoader implements CommandLineRunner {
         userAchievementRepository.save(UserAchievement.builder()
                 .user(user2).achievement(firstBooking).build());
 
-        log.info(">>> User Service DataLoader završen — uneseno {} korisnika, {} loyalty zapisa, {} achievementa.",
+        log.info(">>> User Service DataLoader finished — {} users, {} loyalty records, {} achievements.",
                 userRepository.count(), userLoyaltyRepository.count(), achievementRepository.count());
     }
 }
-

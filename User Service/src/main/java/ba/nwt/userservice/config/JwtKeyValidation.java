@@ -19,10 +19,10 @@ import java.nio.file.Paths;
 @Slf4j
 public class JwtKeyValidation implements ApplicationRunner {
 
-    @Value("${jwt.private-key-path:file:./keys/jwt-private.pem}")
+    @Value("${jwt.private-key-path:classpath:keys/jwt-private.pem}")
     private String privateKeyPath;
 
-    @Value("${jwt.public-key-path:file:./keys/jwt-public.pem}")
+    @Value("${jwt.public-key-path:classpath:keys/jwt-public.pem}")
     private String publicKeyPath;
 
     @Override
@@ -40,8 +40,19 @@ public class JwtKeyValidation implements ApplicationRunner {
     }
 
     private void validateKeyExists(String keyPath, String keyType) {
+        if (keyPath != null && keyPath.startsWith("classpath:")) {
+            validateClasspathKey(keyPath, keyType);
+            return;
+        }
+
         String filePath = stripScheme(keyPath);
-        boolean exists = Files.exists(Paths.get(filePath));
+        boolean exists;
+        try {
+            exists = Files.exists(Paths.get(filePath));
+        } catch (Exception e) {
+            log.error("FATAL: JWT {} key path is invalid: '{}' — {}", keyType, filePath, e.getMessage());
+            throw new IllegalStateException("JWT " + keyType + " key path is invalid: " + filePath, e);
+        }
 
         if (!exists) {
             String errorMsg = String.format(
@@ -55,11 +66,6 @@ public class JwtKeyValidation implements ApplicationRunner {
                 "║  1. Generate RSA keys using: scripts/gen-jwt-keys.sh          ║\n" +
                 "║  2. Copy keys to: ./keys/                                     ║\n" +
                 "║  3. Restart the application                                   ║\n" +
-                "║                                                                ║\n" +
-                "║  DO NOT:                                                       ║\n" +
-                "║  - Use classpath: prefixes in application.properties          ║\n" +
-                "║  - Store keys in src/main/resources                          ║\n" +
-                "║  - Generate keys at runtime in production                     ║\n" +
                 "╚════════════════════════════════════════════════════════════════╝",
                 keyType, filePath
             );
@@ -71,7 +77,24 @@ public class JwtKeyValidation implements ApplicationRunner {
         log.info("✓ JWT {} key found at: {}", keyType, filePath);
     }
 
+    private void validateClasspathKey(String keyPath, String keyType) {
+        String resourcePath = keyPath.substring("classpath:".length());
+        try (var in = getClass().getClassLoader().getResourceAsStream(resourcePath)) {
+            if (in == null) {
+                log.error("FATAL: JWT {} key not found on classpath: {}", keyType, resourcePath);
+                throw new IllegalStateException("JWT " + keyType + " key not found on classpath: " + resourcePath);
+            }
+        } catch (IllegalStateException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("FATAL: Could not read JWT {} key from classpath: {}", keyType, resourcePath, e);
+            throw new IllegalStateException("JWT " + keyType + " key unreadable on classpath: " + resourcePath, e);
+        }
+        log.info("✓ JWT {} key found on classpath: {}", keyType, resourcePath);
+    }
+
     private static String stripScheme(String location) {
+        if (location == null) return "";
         if (location.startsWith("file:")) {
             return location.substring(5);
         }

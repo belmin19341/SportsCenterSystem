@@ -299,34 +299,214 @@ Price quote only displays when time validation errors are zero:
 - `frontend/src/pages/bookingPage.tsx`
 
 
-Issue #21: Team Evaluator - Loyalty Section Shows Error Instead of Informative Message
-Status: ✅ FIXED
+## Issue #21: Loyalty Section Shows Error Instead of Informative Message
 
-Problem
-On the Dashboard, for a user who does not have a loyalty category, the message "Could not load data. Loyalty record not found for user id: 1" is displayed. This is a backend message directly shown to the user, appearing as an application failure rather than a valid state. A user who simply hasn't earned loyalty status yet should not see an error.
+**Status:** ✅ FIXED
 
-Root Cause
-Frontend (frontend/src/lib/format.ts):
+---
 
-The getErrorMessages function did not specifically handle 404 responses for loyalty records, thus displaying the raw backend error message.
-Backend (User Service/src/main/java/ba/nwt/userservice/service/UserLoyaltyService.java):
+### Problem
 
-Throws ResourceNotFoundException when a loyalty record for a user is not found, which is correctly handled by GlobalExceptionHandler to return a 404 status with a descriptive message.
-Solution
-Frontend Changes
-File: frontend/src/lib/format.ts
+On the Dashboard, for a user who does not have a loyalty category, the message "Could not load data. Loyalty record not found for user id: 1" is displayed. This is a backend message directly shown to the user, appearing as an application failure rather than a valid state.
 
-Added specific handling for 404 errors where the message indicates a missing loyalty record, displaying a user-friendly message:
+---
 
-Typescript
+### Root Cause
 
-Apply
+`getErrorMessages` in `format.ts` did not specifically handle 404 responses for loyalty records, so the raw backend error message was forwarded to the UI.
+
+---
+
+### Solution
+
+**File:** `frontend/src/lib/format.ts`
+
+Added specific 404 handling for loyalty record not found:
+
+```typescript
 if ('status' in error && error.status === 404) {
     const message = error.message
     if (message?.includes('Loyalty record not found')) {
-        return ['Trenutno ne pripadate nijednoj loyalty kategoriji.']
+        return ['You are not currently in any loyalty category.']
     }
     return ['Resource not found.']
 }
+```
+
+---
+
+### Files Modified
+
+- `frontend/src/lib/format.ts`
+
+---
+
+## Issue #22: Missing Registration Option / "Missing Authorization Header" on Register
+
+**Status:** ✅ FIXED
+
+---
+
+### Problem
+
+Attempting to register a new account returned `"Missing authorization header"` — registration was completely blocked even though it should be a public (unauthenticated) endpoint.
+
+---
+
+### Root Cause
+
+`JwtAuthenticationFilter.isPublicRoute()` in the API Gateway only whitelisted login, refresh, logout, and token validation. The `/api/auth/register` path was missing from the list, so every registration request was rejected before reaching the User Service.
+
+---
+
+### Solution
+
+**File:** `API Gateway/src/main/java/ba/nwt/apigateway/security/JwtAuthenticationFilter.java`
+
+Added register to the public routes allowlist:
+
+```java
+private boolean isPublicRoute(String path) {
+    return path.endsWith("/api/auth/login")
+        || path.endsWith("/api/auth/refresh")
+        || path.endsWith("/api/auth/logout")
+        || path.endsWith("/api/auth/validate")
+        || path.endsWith("/api/auth/register");  // ← added
+}
+```
+
+---
+
+### Files Modified
+
+- `API Gateway/src/main/java/ba/nwt/apigateway/security/JwtAuthenticationFilter.java`
+
+---
+
+## Issue #23: Language Inconsistency Breaks Search Functionality
+
+**Status:** ✅ FIXED
+
+---
+
+### Problem
+
+Seed data and test strings were in Bosnian while the UI is in English. Searching "Tennis" returned no results because the facility was named "Teniski teren 1". Same mismatch existed for equipment, categories, and achievements.
+
+---
+
+### Root Cause
+
+Both DataLoader classes seeded the database with Bosnian names. Since the `DataLoader` guard (`if (count() > 0)`) prevents re-seeding, the Bosnian data persisted across restarts.
+
+---
+
+### Solution
+
+All Bosnian strings translated to English across seed data, frontend mocks, and tests.
+
+**Key translations:**
+
+| Before | After |
+|--------|-------|
+| Teniski teren 1 | Tennis Court 1 |
+| Mali teren A | Small Field A |
+| Veliki teren B | Large Field B |
+| Nike Fudbalska lopta | Nike Football |
+| Bullpadel Vertex reket | Bullpadel Vertex Racket |
+| Wilson teniski reket | Wilson Tennis Racket |
+| Sobni bicikl | Stationary Bike |
+| Fudbal / Tenis | Football / Tennis |
+| vlasnik_teren | court_owner |
+| Prva rezervacija | First Booking |
+| Redovni igrač | Regular Player |
+| Oprema spremna | Gear Up |
+
+**Note:** Requires `bash run-services.sh --reseed` or manual DB wipe to apply to existing databases.
+
+---
+
+### Files Modified
+
+- `Resource Service/src/main/java/ba/nwt/resourceservice/DataLoader.java`
+- `User Service/src/main/java/ba/nwt/userservice/DataLoader.java`
+- `frontend/src/mocks/handlers.ts`
+- `Resource Service/src/test/.../FacilityControllerTest.java`
+- `Resource Service/src/test/.../FacilityServiceTest.java`
+- `Resource Service/src/test/.../EquipmentServiceTest.java`
+- `Resource Service/src/test/.../FacilityEquipmentFlowIT.java`
+- `User Service/src/test/.../UserAchievementFlowIT.java`
+- `Booking Service/src/test/.../BookingConflictFlowIT.java`
+
+---
+
+## Issue #24: Components Mix Logic and Presentation (Smart/Dumb Pattern)
+
+**Status:** ✅ FIXED
+
+---
+
+### Problem
+
+`registerPage.tsx` was the only page component making raw `fetch()` calls directly, bypassing `lib/http.ts`. This violated the Smart/Dumb separation already applied to all other pages. Two stale hook files also existed at `src/pages/` instead of `src/hooks/`.
+
+---
+
+### Root Cause
+
+Register page was not refactored when the project adopted custom hooks for data fetching. The orphan files `src/pages/useDashboardData.ts` and `src/pages/useHomeData.ts` were leftover duplicates from before the refactor.
+
+---
+
+### Solution
+
+**Extracted logic to hook and API layer:**
+
+- `frontend/src/features/user/api.ts` — added `register()` function using `requestJson`
+- `frontend/src/hooks/useRegisterForm.ts` — new hook with form state, submit handler, error/loading state
+- `frontend/src/pages/registerPage.tsx` — now purely presentational, imports `useRegisterForm`
+
+**Deleted orphan files:**
+
+- `frontend/src/pages/useDashboardData.ts` (duplicate of `src/hooks/useDashboardData.ts`)
+- `frontend/src/pages/useHomeData.ts` (duplicate of `src/hooks/useHomeData.ts`)
+
+---
+
+### Files Modified
+
+- `frontend/src/features/user/api.ts`
+- `frontend/src/hooks/useRegisterForm.ts` *(new)*
+- `frontend/src/pages/registerPage.tsx`
+- ~~`frontend/src/pages/useDashboardData.ts`~~ *(deleted)*
+- ~~`frontend/src/pages/useHomeData.ts`~~ *(deleted)*
+
+---
+
+## Issue #25: Hardcoded Fallback URL in HTTP Helper
+
+**Status:** ✅ ALREADY FIXED (verified)
+
+---
+
+### Problem
+
+HTTP helper had a hardcoded `localhost:8080` fallback URL that would silently override the environment variable in production.
+
+---
+
+### Verification
+
+**File:** `frontend/src/lib/http.ts`
+
+Confirmed the base URL is read exclusively from `import.meta.env.VITE_API_BASE_URL` with no hardcoded fallback. If the env var is missing, the request path is used as-is (relative URL), which is correct behavior for same-origin deployments.
+
+---
+
+### Files Modified
+
+- None (was already correct)
+
+---
 
 

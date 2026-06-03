@@ -52,14 +52,14 @@ class FacilityControllerTest {
     @Test
     void getAll_shouldReturn200() throws Exception {
         FacilityResponseDTO dto = FacilityResponseDTO.builder()
-                .id(1L).name("Mali teren A").type(Facility.FacilityType.FOOTBALL_5V5)
+                .id(1L).name("Small Field A").type(Facility.FacilityType.FOOTBALL_5V5)
                 .basePricePerHour(new BigDecimal("60.00")).status(Facility.FacilityStatus.ACTIVE).build();
 
         when(facilityService.getAll()).thenReturn(List.of(dto));
 
         mockMvc.perform(get("/api/facilities"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].name").value("Mali teren A"));
+                .andExpect(jsonPath("$[0].name").value("Small Field A"));
     }
 
     @Test
@@ -75,13 +75,13 @@ class FacilityControllerTest {
     @Test
     void create_shouldReturn201() throws Exception {
         FacilityRequestDTO request = FacilityRequestDTO.builder()
-                .ownerId(2L).name("Novi teren").type(Facility.FacilityType.PADEL)
+                .ownerId(2L).name("New Court").type(Facility.FacilityType.PADEL)
                 .capacity(4).basePricePerHour(new BigDecimal("40.00"))
                 .workingHoursStart(LocalTime.of(7, 0))
                 .workingHoursEnd(LocalTime.of(22, 0)).build();
 
         FacilityResponseDTO response = FacilityResponseDTO.builder()
-                .id(5L).name("Novi teren").type(Facility.FacilityType.PADEL)
+                .id(5L).name("New Court").type(Facility.FacilityType.PADEL)
                 .status(Facility.FacilityStatus.ACTIVE).build();
 
         when(facilityService.create(any(FacilityRequestDTO.class))).thenReturn(response);
@@ -90,7 +90,7 @@ class FacilityControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.name").value("Novi teren"));
+                .andExpect(jsonPath("$.name").value("New Court"));
     }
 
     @Test
