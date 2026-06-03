@@ -3,6 +3,7 @@ package ba.nwt.apigateway.security;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -22,21 +23,37 @@ final class PemKeyLoader {
      */
     static RSAPublicKey loadPublic(String location) {
         try {
+            log.info("Loading JWT public key from: {}", location);
+
+            if (location != null && location.startsWith("classpath:")) {
+                String resourcePath = location.substring("classpath:".length());
+                try (InputStream in = PemKeyLoader.class.getClassLoader().getResourceAsStream(resourcePath)) {
+                    if (in == null) {
+                        String errorMsg = "FATAL: JWT public key not found on classpath: " + resourcePath;
+                        log.error(errorMsg);
+                        throw new IllegalStateException(errorMsg);
+                    }
+                    byte[] der = readPemDerFromStream(in, "PUBLIC KEY");
+                    RSAPublicKey publicKey = (RSAPublicKey) KeyFactory.getInstance("RSA")
+                            .generatePublic(new X509EncodedKeySpec(der));
+                    log.info("Successfully loaded JWT public key from classpath: {}", resourcePath);
+                    return publicKey;
+                }
+            }
+
             String filePath = stripScheme(location);
             log.info("Loading JWT public key from: {}", filePath);
-            
+
             // Validate file exists
             if (!Files.exists(Paths.get(filePath))) {
                 String errorMsg = String.format(
-                    "FATAL: JWT public key not found at '%s'. " +
-                    "Please ensure the key exists at this filesystem path. " +
-                    "Do not use classpath: paths. Keys must be loaded from disk.",
+                    "FATAL: JWT public key not found at '%s'. Please ensure the key exists at this filesystem path.",
                     filePath
                 );
                 log.error(errorMsg);
                 throw new IllegalStateException(errorMsg);
             }
-            
+
             byte[] der = readPemDer(filePath, "PUBLIC KEY");
             RSAPublicKey publicKey = (RSAPublicKey) KeyFactory.getInstance("RSA")
                     .generatePublic(new X509EncodedKeySpec(der));
@@ -55,16 +72,23 @@ final class PemKeyLoader {
      * Strip 'file:' or 'classpath:' prefix from location path.
      */
     private static String stripScheme(String location) {
+        if (location == null) {
+            return "";
+        }
         if (location.startsWith("file:")) {
             return location.substring(5);
         }
-        if (location.startsWith("classpath:")) {
-            throw new IllegalStateException(
-                "FATAL: Classpath resource paths are not supported for JWT keys. " +
-                "Use 'file:' prefix or relative paths only. Got: " + location
-            );
-        }
+        // leave classpath values untouched; caller handles classpath explicitly
         return location;
+    }
+
+    private static byte[] readPemDerFromStream(InputStream in, String label) throws IOException {
+        String pem = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        String base64 = pem
+                .replace("-----BEGIN " + label + "-----", "")
+                .replace("-----END " + label + "-----", "")
+                .replaceAll("\\s+", "");
+        return Base64.getDecoder().decode(base64);
     }
 
     /**
