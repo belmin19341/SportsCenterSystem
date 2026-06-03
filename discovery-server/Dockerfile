@@ -1,5 +1,5 @@
 # ── Stage 1: Build ────────────────────────────────────────────────────────────
-FROM eclipse-temurin:17-jdk-alpine AS builder
+FROM eclipse-temurin:17-jdk-jammy AS builder
 WORKDIR /build
 COPY mvnw pom.xml ./
 COPY .mvn .mvn/
@@ -9,8 +9,8 @@ RUN ./mvnw clean package -DskipTests -q && \
     java -Djarmode=layertools -jar target/*.jar extract --destination /extracted
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
-FROM eclipse-temurin:17-jre-alpine
-RUN addgroup -S spring && adduser -S spring -G spring
+FROM eclipse-temurin:17-jre-jammy
+RUN apt-get update && apt-get install -y --no-install-recommends wget && rm -rf /var/lib/apt/lists/* && groupadd -r spring && useradd -r -g spring spring
 WORKDIR /app
 COPY --from=builder --chown=spring:spring /extracted/dependencies/ ./
 COPY --from=builder --chown=spring:spring /extracted/spring-boot-loader/ ./

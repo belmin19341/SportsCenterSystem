@@ -5,7 +5,9 @@ services:
   # ═══════════════════════════════════════════════════════════════════════════
 
   mysql-user:
-    image: mysql:8.0
+    build:
+      context: ./docker/mysql-user
+    image: sportcenter/mysql-user
     container_name: sportcenter-user-db
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
@@ -23,9 +25,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    mem_limit: 256m
 
   mysql-resource:
-    image: mysql:8.0
+    build:
+      context: ./docker/mysql-resource
+    image: sportcenter/mysql-resource
     container_name: sportcenter-resource-db
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
@@ -43,9 +48,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    mem_limit: 256m
 
   mysql-booking:
-    image: mysql:8.0
+    build:
+      context: ./docker/mysql-booking
+    image: sportcenter/mysql-booking
     container_name: sportcenter-booking-db
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
@@ -63,9 +71,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    mem_limit: 256m
 
   mysql-payment:
-    image: mysql:8.0
+    build:
+      context: ./docker/mysql-payment
+    image: sportcenter/mysql-payment
     container_name: sportcenter-payment-db
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
@@ -83,6 +94,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    mem_limit: 256m
 
   rabbitmq:
     image: rabbitmq:3.13-management
@@ -102,6 +114,7 @@ services:
       interval: 15s
       timeout: 10s
       retries: 5
+    mem_limit: 384m
 
   # ═══════════════════════════════════════════════════════════════════════════
   # PLATFORM — config and service discovery (start before microservices)
@@ -121,11 +134,12 @@ services:
     networks:
       - sportcenter-net
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8888/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8888/actuator/health || exit 1"]
       interval: 20s
       timeout: 10s
       retries: 5
       start_period: 45s
+    mem_limit: 384m
 
   discovery-server:
     build:
@@ -140,11 +154,12 @@ services:
     networks:
       - sportcenter-net
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8761/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8761/actuator/health || exit 1"]
       interval: 20s
       timeout: 10s
       retries: 5
       start_period: 45s
+    mem_limit: 384m
 
   # ═══════════════════════════════════════════════════════════════════════════
   # MICROSERVICES — all depend on discovery-server being healthy
@@ -173,7 +188,10 @@ services:
       JWT_KID: ${JWT_KID:-sports-key-1}
       JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION:-900}
       JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800}
+      JWT_PRIVATE_KEY_PATH: ${JWT_PRIVATE_KEY_PATH:-classpath:keys/jwt-private.pem}
+      JWT_PUBLIC_KEY_PATH: ${JWT_PUBLIC_KEY_PATH:-classpath:keys/jwt-public.pem}
       INTERNAL_SECRET: ${INTERNAL_SECRET:-CHANGE_ME_INTERNAL_SECRET_DEV_ONLY}
+      GATEWAY_INTERNAL_REVOKE_URL: http://api-gateway:8080/internal/revoke
       JPA_HIBERNATE_DDL_AUTO: ${JPA_HIBERNATE_DDL_AUTO:-update}
     depends_on:
       mysql-user:
@@ -185,11 +203,12 @@ services:
     networks:
       - sportcenter-net
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8081/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 120s
+    mem_limit: 512m
 
   resource-service:
     build:
@@ -214,11 +233,12 @@ services:
     networks:
       - sportcenter-net
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8082/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 120s
+    mem_limit: 512m
 
   booking-service:
     build:
@@ -249,11 +269,12 @@ services:
     networks:
       - sportcenter-net
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8083/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8083/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 120s
+    mem_limit: 512m
 
   payment-service:
     build:
@@ -284,11 +305,12 @@ services:
     networks:
       - sportcenter-net
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8084/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8084/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 120s
+    mem_limit: 512m
 
   # ═══════════════════════════════════════════════════════════════════════════
   # API GATEWAY — routes traffic to microservices via Eureka
@@ -313,22 +335,24 @@ services:
       PAYMENT_SERVICE_PORT: 8084
       JWT_ISSUER: ${JWT_ISSUER:-sports-center-user-service}
       JWT_AUDIENCE: ${JWT_AUDIENCE:-sports-center-api}
+      JWT_PUBLIC_KEY_PATH: ${JWT_PUBLIC_KEY_PATH:-classpath:keys/jwt-public.pem}
       INTERNAL_SECRET: ${INTERNAL_SECRET:-CHANGE_ME_INTERNAL_SECRET_DEV_ONLY}
       RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
       RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-5}
       RATE_LIMIT_WINDOW: ${RATE_LIMIT_WINDOW:-60}
-      FRONTEND_ALLOWED_ORIGINS: ${FRONTEND_ALLOWED_ORIGINS:-http://localhost:80,http://localhost:3000,http://localhost:5173}
+      FRONTEND_ALLOWED_ORIGINS: ${FRONTEND_ALLOWED_ORIGINS:-http://localhost,http://localhost:80,http://localhost:3000,http://localhost:5173,http://127.0.0.1,http://127.0.0.1:80,http://127.0.0.1:3000,http://127.0.0.1:5173}
     depends_on:
       discovery-server:
         condition: service_healthy
     networks:
       - sportcenter-net
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 120s
+    mem_limit: 512m
 
   # ═══════════════════════════════════════════════════════════════════════════
   # FRONTEND — React SPA served via nginx
@@ -348,6 +372,7 @@ services:
         condition: service_healthy
     networks:
       - sportcenter-net
+    mem_limit: 128m
 
 volumes:
   user-db-data:
