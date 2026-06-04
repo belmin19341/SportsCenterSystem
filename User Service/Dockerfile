@@ -3,7 +3,7 @@ FROM eclipse-temurin:17-jdk-jammy AS builder
 WORKDIR /build
 COPY mvnw pom.xml ./
 COPY .mvn .mvn/
-RUN chmod +x mvnw && ./mvnw dependency:go-offline -q
+RUN sed -i 's/\r//' mvnw && chmod +x mvnw && ./mvnw dependency:go-offline -q
 COPY src src/
 RUN ./mvnw clean package -DskipTests -q && \
     java -Djarmode=layertools -jar target/*.jar extract --destination /extracted

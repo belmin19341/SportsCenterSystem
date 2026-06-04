@@ -6,6 +6,8 @@ import ba.nwt.userservice.dto.RegisterRequestDTO;
 import ba.nwt.userservice.exception.UserAlreadyExistsException;
 import ba.nwt.userservice.exception.ResourceNotFoundException;
 import ba.nwt.userservice.model.User;
+import ba.nwt.userservice.model.UserLoyalty;
+import ba.nwt.userservice.repository.UserLoyaltyRepository;
 import ba.nwt.userservice.repository.UserRepository;
 import ba.nwt.userservice.security.GatewayRevokeClient;
 import ba.nwt.userservice.security.JwtTokenProvider;
@@ -32,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthenticationService {
 
     private final UserRepository userRepository;
+    private final UserLoyaltyRepository userLoyaltyRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final GatewayRevokeClient gatewayRevokeClient;
@@ -63,6 +66,14 @@ public class AuthenticationService {
                 .build();
 
         User savedUser = userRepository.save(user);
+
+        userLoyaltyRepository.save(
+            UserLoyalty.builder()
+                .user(savedUser)
+                .totalPoints(0)
+                .tier(UserLoyalty.LoyaltyTier.BRONZE)
+                .build()
+        );
 
         String access = jwtTokenProvider.generateAccessToken(
                 savedUser.getId(), savedUser.getUsername(), savedUser.getEmail(), savedUser.getRole().name());

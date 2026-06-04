@@ -267,37 +267,28 @@ healthcheck:
 
 ## Pokretanje
 
-### Cijeli stack (sve iz Dockera)
+Cijeli stack (baze, RabbitMQ, svi mikroservisi, API Gateway, frontend) pokreće se **jednom komandom**:
 
 ```bash
-# Prva izgradnja — preuzima base slike i builda sve (10-15 min)
 docker compose up --build
-
-# Sljedeći puta — koristi Docker cache (mnogo brže)
-docker compose up
-
-# U pozadini
-docker compose up -d
-
-# Gledanje logova
-docker compose logs -f
-docker compose logs -f user-service
 ```
 
-### Samo infrastruktura (lokalni razvoj)
+| Situacija | Komanda |
+|-----------|---------|
+| Prva izgradnja / nakon izmjena koda | `docker compose up --build` |
+| Ponovni start bez izmjena (koristi cache) | `docker compose up` |
+| Pokretanje u pozadini | `docker compose up --build -d` |
+| Praćenje logova | `docker compose logs -f` |
+| Logovi jednog servisa | `docker compose logs -f user-service` |
+| Potpuni reset (briše baze) | `docker compose down -v && docker compose up --build` |
 
-Stari način — servisi se pokreću lokalno, samo baze i RabbitMQ u Dockeru:
+> **Napomena:** Docker i lokalni servisi (`run-services.sh`) ne mogu raditi istovremeno jer koriste iste portove. Pokrenuti jedno ili drugo.
 
-```bash
-bash run-services.sh
-```
-
-### Reset i reseed podataka
-
-```bash
-docker compose down -v          # briše kontejnere i volumene (čisti podaci)
-docker compose up --build       # sve kreće ispočetka, DataLoader puni podatke
-```
+Nakon pokretanja, aplikacija je dostupna na:
+- **Frontend:** http://localhost
+- **API Gateway:** http://localhost:8080
+- **Eureka:** http://localhost:8761
+- **RabbitMQ Management:** http://localhost:15672
 
 ---
 

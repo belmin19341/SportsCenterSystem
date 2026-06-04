@@ -92,7 +92,7 @@ public class PaymentService {
                 .depositAmount(dto.getDepositAmount())
                 .paymentMethod(dto.getPaymentMethod())
                 .transactionId("TXN-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
-                .status(dto.getStatus() != null ? dto.getStatus() : Payment.PaymentStatus.PENDING)
+                .status(Payment.PaymentStatus.PAID) // auto-approve: replace with real payment gateway later
                 .build();
 
         if (payment.getStatus() == Payment.PaymentStatus.PAID) {
