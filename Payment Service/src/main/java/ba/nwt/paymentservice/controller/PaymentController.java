@@ -2,16 +2,23 @@ package ba.nwt.paymentservice.controller;
 
 import ba.nwt.paymentservice.dto.PaymentRequestDTO;
 import ba.nwt.paymentservice.dto.PaymentResponseDTO;
+import ba.nwt.paymentservice.dto.RevenueReportDTO;
 import ba.nwt.paymentservice.model.Payment;
 import ba.nwt.paymentservice.service.PaymentService;
+import com.github.fge.jsonpatch.JsonPatch;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -28,12 +35,12 @@ public class PaymentController {
             @RequestParam(required = false) Payment.PaymentStatus status,
             @RequestParam(required = false) Payment.PaymentMethod method,
             @RequestParam(required = false) Long bookingId,
-            @RequestParam(required = false) java.math.BigDecimal minAmount,
-            @RequestParam(required = false) java.math.BigDecimal maxAmount,
-            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime from,
-            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime to,
+            @RequestParam(required = false) BigDecimal minAmount,
+            @RequestParam(required = false) BigDecimal maxAmount,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
             @RequestParam(defaultValue = "false") boolean paged,
-            @org.springframework.data.web.PageableDefault(size = 20, sort = "id") org.springframework.data.domain.Pageable pageable) {
+            @PageableDefault(size = 20, sort = "id") Pageable pageable) {
         if (paged || status != null || method != null || bookingId != null
                 || minAmount != null || maxAmount != null || from != null || to != null) {
             return ResponseEntity.ok(paymentService.search(status, method, bookingId,
@@ -45,7 +52,7 @@ public class PaymentController {
     @PatchMapping(value = "/{id}", consumes = "application/json-patch+json")
     @Operation(summary = "Partially update a payment (RFC 6902 JSON Patch)")
     public ResponseEntity<PaymentResponseDTO> patch(@PathVariable Long id,
-                                                    @RequestBody com.github.fge.jsonpatch.JsonPatch patch) {
+                                                    @RequestBody JsonPatch patch) {
         return ResponseEntity.ok(paymentService.patch(id, patch));
     }
 
@@ -59,9 +66,9 @@ public class PaymentController {
 
     @GetMapping("/revenue")
     @Operation(summary = "Aggregate revenue (PAID) between two timestamps, total + per method")
-    public ResponseEntity<PaymentService.RevenueReport> revenue(
-            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime from,
-            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime to) {
+    public ResponseEntity<RevenueReportDTO> revenue(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
         return ResponseEntity.ok(paymentService.getRevenueBetween(from, to));
     }
 
@@ -97,7 +104,8 @@ public class PaymentController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update a payment")
-    public ResponseEntity<PaymentResponseDTO> update(@PathVariable Long id, @Valid @RequestBody PaymentRequestDTO dto) {
+    public ResponseEntity<PaymentResponseDTO> update(@PathVariable Long id,
+                                                     @Valid @RequestBody PaymentRequestDTO dto) {
         return ResponseEntity.ok(paymentService.update(id, dto));
     }
 
@@ -108,4 +116,3 @@ public class PaymentController {
         return ResponseEntity.noContent().build();
     }
 }
-

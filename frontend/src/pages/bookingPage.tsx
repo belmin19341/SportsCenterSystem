@@ -1,3 +1,5 @@
+import {Elements} from '@stripe/react-stripe-js'
+import {loadStripe} from '@stripe/stripe-js'
 import {useBookingData} from '@/hooks/useBookingData'
 import {LoadingOrError} from '@/components/loadingOrError'
 import {Alert} from '@/components/ui/alert'
@@ -11,6 +13,7 @@ import {
 } from '@/components/ui/card'
 import {BookingBasicsFields} from '@/features/bookings/bookingBasicsFields'
 import {BookingScheduleFields} from '@/features/bookings/bookingScheduleFields'
+import {PaymentForm} from '@/features/bookings/paymentForm'
 import {
 	formatDuration,
 	formatRateSummary
@@ -18,12 +21,22 @@ import {
 import {SelectedFacilitySummary} from '@/features/bookings/selectedFacilitySummary'
 import {formatCurrency} from '@/lib/format'
 
+const publishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined
+const stripePromise = publishableKey ? loadStripe(publishableKey) : null
+
+const elementsOptions = {
+	appearance: {theme: 'night' as const}
+}
+
 export function BookingPage() {
 	const {
-		form, setForm, facilitiesQuery, quoteQuery, conflictsQuery, selectedFacility,
+		form, setForm, facilitiesQuery, savedCardsQuery, paymentFormRef,
+		quoteQuery, conflictsQuery, selectedFacility,
 		isTimeRangeValid, minimumBookingDateTime, minimumEndDateTime, bookingValidationErrors,
 		errorMessage, hasSubmitted, handleStartTimeChange, handleSubmit, isPending
-	} = useBookingData();
+	} = useBookingData()
+
+	const savedCards = savedCardsQuery.data ?? []
 
 	return (
 		<div className='mx-auto w-full max-w-4xl space-y-5 sm:space-y-6'>
@@ -50,13 +63,6 @@ export function BookingPage() {
 										facilityId: nextFacilityId
 									}))
 								}
-								onChangePaymentMethod={nextPaymentMethod =>
-									setForm(currentForm => ({
-										...currentForm,
-										paymentMethod: nextPaymentMethod
-									}))
-								}
-								paymentMethod={form.paymentMethod}
 							/>
 
 							<BookingScheduleFields
@@ -121,6 +127,17 @@ export function BookingPage() {
 							{selectedFacility ? (
 								<SelectedFacilitySummary facility={selectedFacility} />
 							) : null}
+
+							{/* Payment section */}
+							<div className='rounded-lg border border-slate-800 bg-slate-900/50 p-4'>
+								<Elements options={elementsOptions} stripe={stripePromise}>
+									<PaymentForm
+										ref={paymentFormRef}
+										savedCards={savedCards}
+										stripeReady={Boolean(stripePromise)}
+									/>
+								</Elements>
+							</div>
 
 							{hasSubmitted && bookingValidationErrors.length > 0 ? (
 								<Alert variant='destructive'>

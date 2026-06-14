@@ -1,7 +1,8 @@
-import {Suspense} from 'react'
+import {useQueryClient} from '@tanstack/react-query'
+import {Suspense, useEffect, useRef} from 'react'
 import {ErrorBoundary, type FallbackProps} from 'react-error-boundary'
 import {Route, Routes} from 'react-router'
-import {AuthProvider} from '@/auth/authContext'
+import {useAuth, AuthProvider} from '@/auth/authContext'
 import {ProtectedRoute} from '@/auth/protectedRoute'
 import {AppShell} from '@/components/appShell'
 import {FeedbackProvider} from '@/components/feedback'
@@ -19,6 +20,22 @@ function renderError({error}: FallbackProps) {
 	return <LoadingOrError error={error} />
 }
 
+function CacheCleaner() {
+	const {session} = useAuth()
+	const queryClient = useQueryClient()
+	const prevUserId = useRef<number | undefined>(undefined)
+
+	useEffect(() => {
+		const id = session?.userId
+		if (prevUserId.current !== undefined && prevUserId.current !== id) {
+			queryClient.clear()
+		}
+		prevUserId.current = id
+	}, [session?.userId, queryClient])
+
+	return null
+}
+
 export function App() {
 	// Issue #25: Validation to ensure VITE_API_BASE_URL is defined at runtime.
 	// This prevents the app from silently failing or using a wrong hardcoded fallback.
@@ -32,6 +49,7 @@ export function App() {
 		<ErrorBoundary fallbackRender={renderError}>
 			<FeedbackProvider>
 				<AuthProvider>
+					<CacheCleaner />
 					<AppShell>
 						<Suspense fallback={<LoadingOrError title='Loading route' />}>
 							<Routes>

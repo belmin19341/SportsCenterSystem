@@ -2,6 +2,8 @@ package ba.nwt.paymentservice;
 
 import ba.nwt.paymentservice.model.*;
 import ba.nwt.paymentservice.repository.*;
+import ba.nwt.paymentservice.service.SavedCardService;
+import ba.nwt.paymentservice.service.StripeGateway;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -20,6 +22,8 @@ public class DataLoader implements CommandLineRunner {
     private final NotificationRepository notificationRepository;
     private final DocumentRepository documentRepository;
     private final DisputeRepository disputeRepository;
+    private final SavedCardService savedCardService;
+    private final StripeGateway stripeGateway;
 
     @Override
     public void run(String... args) {
@@ -130,6 +134,25 @@ public class DataLoader implements CommandLineRunner {
                 .description("The court was wet and slippery; we weren't told it had been watered before the session.")
                 .status(Dispute.DisputeStatus.OPEN)
                 .build());
+
+        // ── Saved cards (seed for users 4=belmin_d and 5=harun_g) ──
+        // tok_visa is a Stripe test token that always succeeds
+        if (stripeGateway.isEnabled()) {
+            try {
+                String cus1 = stripeGateway.createCustomer("tok_visa");
+                savedCardService.save(4L, "4242", "visa", cus1);
+                String cus2 = stripeGateway.createCustomer("tok_visa");
+                savedCardService.save(5L, "4242", "visa", cus2);
+                log.info(">>> Seeded 2 Stripe saved cards (users 4, 5).");
+            } catch (Exception e) {
+                log.warn(">>> Stripe saved card seeding failed (Stripe may be unreachable): {}", e.getMessage());
+            }
+        } else {
+            // Stripe not configured — seed mock records so UI shows saved cards
+            savedCardService.save(4L, "4242", "visa", "cus_mock_belmin");
+            savedCardService.save(5L, "4242", "visa", "cus_mock_harun");
+            log.info(">>> Seeded 2 mock saved cards (Stripe key not configured).");
+        }
 
         log.info(">>> Payment Service DataLoader finished — {} payments, {} notifications, {} documents, {} disputes.",
                 paymentRepository.count(), notificationRepository.count(),

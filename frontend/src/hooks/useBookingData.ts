@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useAuth } from '@/auth/authContext';
 import { useFeedback } from '@/components/feedback';
-import { createBooking, listConflictingBookings } from '@/features/bookings/api';
+import { createBooking, getSavedCards, listConflictingBookings } from '@/features/bookings/api';
+import type { PaymentFormHandle } from '@/features/bookings/paymentForm';
 import {
 	type BookingDraft,
 	clearBookingDraft,
@@ -33,6 +34,7 @@ export function useBookingData() {
 	const [form, setForm] = useState<BookingDraft>(() =>
 		createInitialBookingDraft(requestedFacilityId)
 	);
+	const paymentFormRef = useRef<PaymentFormHandle>(null);
 
 	useEffect(() => {
 		if (requestedFacilityId) {
@@ -47,6 +49,12 @@ export function useBookingData() {
 	const facilitiesQuery = useQuery({
 		queryFn: () => listFacilities(),
 		queryKey: ['facilities']
+	});
+
+	const savedCardsQuery = useQuery({
+		enabled: Boolean(session),
+		queryFn: () => getSavedCards(session!.userId),
+		queryKey: ['saved-cards', session?.userId]
 	});
 
 	const isTimeRangeValid = useMemo(() => isValidDateRange(form.startTime, form.endTime), [form.endTime, form.startTime]);
@@ -88,16 +96,23 @@ export function useBookingData() {
 			if (!selectedFacility) throw new Error('Choose a facility before continuing.');
 			if (!quoteQuery.data) throw new Error('A valid price quote is required.');
 
+			const paymentData = await paymentFormRef.current?.getPaymentData();
+
 			return createBooking({
 				endTime: form.endTime,
 				facilityId: selectedFacility.id,
 				isRecurring: false,
-				paymentMethod: form.paymentMethod,
 				recurringPattern: null,
 				startTime: form.startTime,
 				status: 'PENDING',
 				totalPrice: quoteQuery.data.totalPrice,
-				userId: session.userId
+				userId: session.userId,
+				paymentMethod: paymentData?.paymentMethod ?? 'CREDIT_CARD',
+				stripeToken: paymentData?.stripeToken,
+				savedCardId: paymentData?.savedCardId,
+				saveCard: paymentData?.saveCard,
+				cardLast4: paymentData?.cardLast4,
+				cardBrand: paymentData?.cardBrand
 			});
 		},
 		onSuccess: async () => {
@@ -130,6 +145,8 @@ export function useBookingData() {
 		form,
 		setForm,
 		facilitiesQuery,
+		savedCardsQuery,
+		paymentFormRef,
 		quoteQuery,
 		conflictsQuery,
 		selectedFacility,

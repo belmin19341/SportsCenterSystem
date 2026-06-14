@@ -24,7 +24,8 @@ services:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
     mem_limit: 256m
 
   mysql-resource:
@@ -47,7 +48,8 @@ services:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
     mem_limit: 256m
 
   mysql-booking:
@@ -70,7 +72,8 @@ services:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
     mem_limit: 256m
 
   mysql-payment:
@@ -93,7 +96,8 @@ services:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
     mem_limit: 256m
 
   rabbitmq:
@@ -170,6 +174,7 @@ services:
       context: ./User Service
     image: sportcenter/user-service
     container_name: sportcenter-user-service
+    restart: on-failure
     ports:
       - "${USER_SERVICE_PORT:-8081}:8081"
     environment:
@@ -215,6 +220,7 @@ services:
       context: ./Resource Service
     image: sportcenter/resource-service
     container_name: sportcenter-resource-service
+    restart: on-failure
     ports:
       - "${RESOURCE_SERVICE_PORT:-8082}:8082"
     environment:
@@ -245,6 +251,7 @@ services:
       context: ./Booking Service
     image: sportcenter/booking-service
     container_name: sportcenter-booking-service
+    restart: on-failure
     ports:
       - "${BOOKING_SERVICE_PORT:-8083}:8083"
     environment:
@@ -281,6 +288,7 @@ services:
       context: ./Payment Service
     image: sportcenter/payment-service
     container_name: sportcenter-payment-service
+    restart: on-failure
     ports:
       - "${PAYMENT_SERVICE_PORT:-8084}:8084"
     environment:
@@ -295,6 +303,7 @@ services:
       RABBITMQ_USER: ${RABBITMQ_USER:-guest}
       RABBITMQ_PASS: ${RABBITMQ_PASS:-guest}
       JPA_HIBERNATE_DDL_AUTO: ${JPA_HIBERNATE_DDL_AUTO:-update}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
     depends_on:
       mysql-payment:
         condition: service_healthy
@@ -363,6 +372,7 @@ services:
       context: ./frontend
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
+        VITE_STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
     image: sportcenter/frontend
     container_name: sportcenter-frontend
     ports:

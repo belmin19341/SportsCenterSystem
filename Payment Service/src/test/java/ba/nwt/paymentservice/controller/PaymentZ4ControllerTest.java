@@ -3,6 +3,7 @@ package ba.nwt.paymentservice.controller;
 import ba.nwt.paymentservice.dto.NotificationRequestDTO;
 import ba.nwt.paymentservice.dto.NotificationResponseDTO;
 import ba.nwt.paymentservice.dto.PaymentResponseDTO;
+import ba.nwt.paymentservice.dto.RevenueReportDTO;
 import ba.nwt.paymentservice.exception.GlobalExceptionHandler;
 import ba.nwt.paymentservice.exception.ResourceNotFoundException;
 import ba.nwt.paymentservice.model.Notification;
@@ -133,11 +134,11 @@ class PaymentZ4ControllerTest {
 
     @Test
     void revenue_shouldReturn200() throws Exception {
-        PaymentService.RevenueReport report = PaymentService.RevenueReport.builder()
+        RevenueReportDTO report = RevenueReportDTO.builder()
                 .from(LocalDateTime.now().minusDays(7))
                 .to(LocalDateTime.now())
                 .totalRevenue(new BigDecimal("123.45"))
-                .byMethod(List.of(PaymentService.RevenueByMethod.builder()
+                .byMethod(List.of(RevenueReportDTO.RevenueByMethodDTO.builder()
                         .method(Payment.PaymentMethod.CREDIT_CARD)
                         .total(new BigDecimal("123.45"))
                         .count(2L).build()))

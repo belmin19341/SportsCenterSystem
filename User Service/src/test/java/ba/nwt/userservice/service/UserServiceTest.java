@@ -1,16 +1,19 @@
 package ba.nwt.userservice.service;
 
+import ba.nwt.userservice.config.JsonPatchUtil;
 import ba.nwt.userservice.dto.UserRequestDTO;
 import ba.nwt.userservice.dto.UserResponseDTO;
 import ba.nwt.userservice.exception.ResourceNotFoundException;
 import ba.nwt.userservice.model.User;
+import ba.nwt.userservice.model.UserLoyalty;
+import ba.nwt.userservice.repository.UserLoyaltyRepository;
 import ba.nwt.userservice.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -21,6 +24,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -30,7 +34,13 @@ class UserServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private UserLoyaltyRepository userLoyaltyRepository;
+
+    @Mock
     private ModelMapper modelMapper;
+
+    @Mock
+    private JsonPatchUtil jsonPatchUtil;
 
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -107,6 +117,7 @@ class UserServiceTest {
         when(userRepository.existsByEmail("new@example.com")).thenReturn(false);
         when(passwordEncoder.encode("password123")).thenReturn("encoded-password");
         when(userRepository.save(any(User.class))).thenReturn(user);
+        when(userLoyaltyRepository.save(any(UserLoyalty.class))).thenAnswer(inv -> inv.getArgument(0));
         when(modelMapper.map(any(User.class), eq(UserResponseDTO.class))).thenReturn(responseDTO);
 
         UserResponseDTO result = userService.createUser(requestDTO);
@@ -115,6 +126,7 @@ class UserServiceTest {
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(captor.capture());
         assertThat(captor.getValue().getPasswordHash()).isEqualTo("encoded-password");
+        verify(userLoyaltyRepository).save(any(UserLoyalty.class));
     }
 
     @Test

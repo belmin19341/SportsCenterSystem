@@ -48,7 +48,7 @@ public class Payment {
 
     // ── Enums ──
     public enum PaymentMethod {
-        CREDIT_CARD, DEBIT_CARD, PAYPAL
+        CREDIT_CARD, DEBIT_CARD, PAYPAL, CASH
     }
 
     public enum PaymentStatus {

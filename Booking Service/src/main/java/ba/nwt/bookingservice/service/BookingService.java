@@ -337,11 +337,21 @@ public class BookingService {
         // Step 3 — charge (mandatory; on any failure mark booking CANCELLED and rethrow)
         PaymentView payment;
         try {
+            // paymentMethod: prefer body field, fall back to query param
+            String resolvedMethod = (dto.getPaymentMethod() != null && !dto.getPaymentMethod().isBlank())
+                    ? dto.getPaymentMethod()
+                    : (paymentMethod != null ? paymentMethod : "CREDIT_CARD");
+
             payment = paymentServiceClient.createPayment(PaymentCreateView.builder()
                     .userId(dto.getUserId())
                     .bookingId(booking.getId())
                     .amount(authoritativePrice)
-                    .paymentMethod(paymentMethod == null ? "CREDIT_CARD" : paymentMethod)
+                    .paymentMethod(resolvedMethod)
+                    .stripeToken(dto.getStripeToken())
+                    .savedCardId(dto.getSavedCardId())
+                    .saveCard(dto.getSaveCard())
+                    .cardLast4(dto.getCardLast4())
+                    .cardBrand(dto.getCardBrand())
                     .build());
         } catch (RuntimeException ex) {
             booking.setStatus(Booking.BookingStatus.CANCELLED);

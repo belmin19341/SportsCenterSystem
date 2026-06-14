@@ -14,7 +14,7 @@ export type FacilityType =
 	| 'TENNIS'
 	| 'TABLE_TENNIS'
 
-export type PaymentMethod = 'CREDIT_CARD' | 'DEBIT_CARD' | 'PAYPAL'
+export type PaymentMethod = 'CREDIT_CARD' | 'DEBIT_CARD' | 'PAYPAL' | 'CASH'
 export type PaymentStatus = 'FAILED' | 'PAID' | 'PENDING' | 'REFUNDED'
 export type EquipmentType =
 	| 'RACKET'
@@ -173,6 +173,13 @@ export interface UserAchievementResponse {
 	username: string
 }
 
+export interface SavedCardResponse {
+	id: number
+	last4: string
+	brand: string
+	createdAt: string
+}
+
 export interface BookingRequest {
 	endTime: string
 	facilityId: number
@@ -182,6 +189,13 @@ export interface BookingRequest {
 	status: BookingStatus
 	totalPrice: number
 	userId: number
+	// Payment fields
+	paymentMethod?: PaymentMethod
+	stripeToken?: string
+	savedCardId?: number
+	saveCard?: boolean
+	cardLast4?: string
+	cardBrand?: string
 }
 
 export interface BookingResponse {

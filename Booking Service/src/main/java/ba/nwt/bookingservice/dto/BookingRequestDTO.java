@@ -31,5 +31,13 @@ public class BookingRequestDTO {
     private Boolean isRecurring;
     private String recurringPattern;
     private Booking.BookingStatus status;
+
+    // Payment fields from frontend
+    private String paymentMethod;  // CREDIT_CARD | DEBIT_CARD | CASH | PAYPAL
+    private String stripeToken;
+    private Long savedCardId;
+    private Boolean saveCard;
+    private String cardLast4;
+    private String cardBrand;
 }
 
