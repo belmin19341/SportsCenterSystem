@@ -23,6 +23,8 @@ export function DashboardPage() {
 		rentalsQuery,
 		notificationsQuery,
 		paymentsQuery,
+		savedCardsQuery,
+		deleteCardMutation,
 		markReadMutation,
 		filters,
 		derived
@@ -102,6 +104,51 @@ export function DashboardPage() {
 								<div className='text-sm text-slate-400'>
 									Last updated {formatDateTime(loyaltyQuery.data.updatedAt)}
 								</div>
+							</div>
+						)}
+					</CardContent>
+				</Card>
+			</section>
+
+			<section>
+				<Card>
+					<CardHeader>
+						<CardTitle>Saved Cards</CardTitle>
+						<CardDescription>Cards saved for future payments.</CardDescription>
+					</CardHeader>
+					<CardContent>
+						{savedCardsQuery.isPending ? (
+							<LoadingOrError title='Loading saved cards' />
+						) : savedCardsQuery.isError ? (
+							<LoadingOrError error={savedCardsQuery.error} />
+						) : !savedCardsQuery.data || savedCardsQuery.data.length === 0 ? (
+							<div className='text-sm text-slate-400'>No saved cards.</div>
+						) : (
+							<div className='space-y-3'>
+								{savedCardsQuery.data.map((card: any) => (
+									<div
+										className='flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/50 p-4'
+										key={card.id}
+									>
+										<div className='text-sm text-slate-300'>
+											<span className='font-medium text-white'>
+												{card.brand.toUpperCase()}
+											</span>{' '}
+											•••• {card.last4}
+											<div className='mt-0.5 text-xs text-slate-500'>
+												Added {formatDate(card.createdAt)}
+											</div>
+										</div>
+										<Button
+											disabled={deleteCardMutation.isPending}
+											onClick={() => deleteCardMutation.mutate(card.id)}
+											size='sm'
+											variant='outline'
+										>
+											Remove
+										</Button>
+									</div>
+								))}
 							</div>
 						)}
 					</CardContent>

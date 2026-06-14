@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useAuth } from '@/auth/authContext';
 import { useFeedback } from '@/components/feedback';
-import { listUserBookings, listUserRentals, listPaymentsForBookings } from '@/features/bookings/api';
+import { listUserBookings, listUserRentals, listPaymentsForBookings, getSavedCards, deleteSavedCard } from '@/features/bookings/api';
 import { listFacilities } from '@/features/resources/api';
 import { getUser, getUserLoyalty, listUserAchievements, listUserNotifications, markNotificationAsRead } from '@/features/user/api';
 import { getErrorMessage } from '@/lib/format';
@@ -64,6 +64,21 @@ export function useDashboardData() {
 		queryKey: ['payments', userId, JSON.stringify((bookingsQuery.data || []).map((b: any) => b.id))]
 	});
 
+	const savedCardsQuery = useQuery({
+		enabled: Boolean(session),
+		queryFn: () => getSavedCards(userId),
+		queryKey: ['savedCards', userId]
+	});
+
+	const deleteCardMutation = useMutation({
+		mutationFn: (id: number) => deleteSavedCard(id),
+		onError: (error: any) => showFeedback({ description: getErrorMessage(error), title: 'Could not remove card', variant: 'destructive' }),
+		onSuccess: () => {
+			showFeedback({ description: 'Card removed from your account.', title: 'Card deleted', variant: 'success' });
+			return queryClient.invalidateQueries({ queryKey: ['savedCards', userId] });
+		}
+	});
+
 	const markReadMutation = useMutation({
 		mutationFn: (id: number) => markNotificationAsRead(id),
 		onError: (error: any) => showFeedback({ description: getErrorMessage(error), title: 'Notification update failed', variant: 'destructive' }),
@@ -98,6 +113,8 @@ export function useDashboardData() {
 		rentalsQuery,
 		notificationsQuery,
 		paymentsQuery,
+		savedCardsQuery,
+		deleteCardMutation,
 		markReadMutation,
 		filters: { bookingFilter, setBookingFilter, notificationFilter, setNotificationFilter },
 		derived: { facilityNameById, visibleBookings, visibleNotifications }
