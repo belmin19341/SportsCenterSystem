@@ -81,6 +81,11 @@ public class BookingService {
         if (patched.getEndTime().isBefore(patched.getStartTime())) {
             throw new IllegalArgumentException("End time must be after start time");
         }
+
+        // Validate patched booking times are within facility working hours
+        FacilityView facility = resourceServiceClient.getFacility(patched.getFacilityId());
+        validateBookingWithinWorkingHours(facility, patched.getStartTime(), patched.getEndTime());
+
         // Reject reschedule onto a conflicting slot (excluding self).
         List<Booking> conflicts = bookingRepository.findConflicting(
                 patched.getFacilityId(), patched.getStartTime(), patched.getEndTime());
@@ -111,6 +116,11 @@ public class BookingService {
         if (!base.getEndTime().isAfter(base.getStartTime())) {
             throw new IllegalArgumentException("End time must be after start time");
         }
+
+        // Validate base booking times are within facility working hours
+        FacilityView facility = resourceServiceClient.getFacility(base.getFacilityId());
+        validateBookingWithinWorkingHours(facility, base.getStartTime(), base.getEndTime());
+
         ChronoUnit step = switch (pattern == null ? "WEEKLY" : pattern.toUpperCase()) {
             case "DAILY"   -> ChronoUnit.DAYS;
             case "WEEKLY"  -> ChronoUnit.WEEKS;
@@ -153,6 +163,11 @@ public class BookingService {
         if (!bookingDto.getEndTime().isAfter(bookingDto.getStartTime())) {
             throw new IllegalArgumentException("End time must be after start time");
         }
+
+        // Validate group booking times are within facility working hours
+        FacilityView facility = resourceServiceClient.getFacility(bookingDto.getFacilityId());
+        validateBookingWithinWorkingHours(facility, bookingDto.getStartTime(), bookingDto.getEndTime());
+
         List<Booking> conflicts = bookingRepository.findConflicting(
                 bookingDto.getFacilityId(), bookingDto.getStartTime(), bookingDto.getEndTime());
         if (!conflicts.isEmpty()) {
@@ -212,6 +227,11 @@ public class BookingService {
         if (dto.getEndTime().isBefore(dto.getStartTime())) {
             throw new IllegalArgumentException("End time must be after start time");
         }
+
+        // Validate booking times are within facility working hours
+        FacilityView facility = resourceServiceClient.getFacility(dto.getFacilityId());
+        validateBookingWithinWorkingHours(facility, dto.getStartTime(), dto.getEndTime());
+
         Booking booking = Booking.builder()
                 .userId(dto.getUserId())
                 .facilityId(dto.getFacilityId())
@@ -235,6 +255,10 @@ public class BookingService {
         if (dto.getEndTime().isBefore(dto.getStartTime())) {
             throw new IllegalArgumentException("End time must be after start time");
         }
+
+        // Validate updated booking times are within facility working hours
+        FacilityView facility = resourceServiceClient.getFacility(dto.getFacilityId());
+        validateBookingWithinWorkingHours(facility, dto.getStartTime(), dto.getEndTime());
 
         booking.setUserId(dto.getUserId());
         booking.setFacilityId(dto.getFacilityId());
@@ -286,6 +310,9 @@ public class BookingService {
                             + (facility == null ? "null" : facility.getStatus()) + ")");
         }
 
+        // Validate booking times are within facility working hours
+        validateBookingWithinWorkingHours(facility, dto.getStartTime(), dto.getEndTime());
+
         // Step 2 — authoritative price (mandatory)
         PriceQuoteView quote = resourceServiceClient.calculatePrice(
                 dto.getFacilityId(), dto.getStartTime(), dto.getEndTime());
@@ -310,11 +337,21 @@ public class BookingService {
         // Step 3 — charge (mandatory; on any failure mark booking CANCELLED and rethrow)
         PaymentView payment;
         try {
+            // paymentMethod: prefer body field, fall back to query param
+            String resolvedMethod = (dto.getPaymentMethod() != null && !dto.getPaymentMethod().isBlank())
+                    ? dto.getPaymentMethod()
+                    : (paymentMethod != null ? paymentMethod : "CREDIT_CARD");
+
             payment = paymentServiceClient.createPayment(PaymentCreateView.builder()
                     .userId(dto.getUserId())
                     .bookingId(booking.getId())
                     .amount(authoritativePrice)
-                    .paymentMethod(paymentMethod == null ? "CREDIT_CARD" : paymentMethod)
+                    .paymentMethod(resolvedMethod)
+                    .stripeToken(dto.getStripeToken())
+                    .savedCardId(dto.getSavedCardId())
+                    .saveCard(dto.getSaveCard())
+                    .cardLast4(dto.getCardLast4())
+                    .cardBrand(dto.getCardBrand())
                     .build());
         } catch (RuntimeException ex) {
             booking.setStatus(Booking.BookingStatus.CANCELLED);
@@ -342,6 +379,40 @@ public class BookingService {
         }
 
         return modelMapper.map(booking, BookingResponseDTO.class);
+    }
+
+    /**
+     * Validates that booking start and end times fall within facility's working hours.
+     * Throws IllegalArgumentException if times are outside working hours.
+     */
+    private void validateBookingWithinWorkingHours(FacilityView facility,
+                                                    LocalDateTime startTime,
+                                                    LocalDateTime endTime) {
+        if (facility == null) {
+            throw new IllegalArgumentException("Facility not found");
+        }
+
+        if (facility.getWorkingHoursStart() == null || facility.getWorkingHoursEnd() == null) {
+            // No working hours constraint defined for this facility
+            return;
+        }
+
+        java.time.LocalTime start = startTime.toLocalTime();
+        java.time.LocalTime end = endTime.toLocalTime();
+        java.time.LocalTime open = facility.getWorkingHoursStart();
+        java.time.LocalTime close = facility.getWorkingHoursEnd();
+
+        // Check if start time is before opening time
+        if (start.isBefore(open)) {
+            throw new IllegalArgumentException(
+                    "Booking start time must be after facility opening time (" + open + ")");
+        }
+
+        // Check if end time is after closing time
+        if (end.isAfter(close)) {
+            throw new IllegalArgumentException(
+                    "Booking end time must be before facility closing time (" + close + ")");
+        }
     }
 }
 

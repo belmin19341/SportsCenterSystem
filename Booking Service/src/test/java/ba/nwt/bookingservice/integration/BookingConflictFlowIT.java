@@ -29,8 +29,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Flow: conflict detection između rezervacija.
- * Testira da conflict query ispravno detektuje preklapanja i ignoruje otkazane rezervacije.
+ * Flow: conflict detection between bookings.
+ * Tests that the conflict query correctly detects overlaps and ignores cancelled bookings.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
@@ -82,7 +82,7 @@ class BookingConflictFlowIT {
         LocalDateTime base = LocalDateTime.now().plusDays(7).withHour(10).withMinute(0).withSecond(0).withNano(0);
 
         createBooking(FACILITY_A, base, base.plusHours(2));            // 10:00–12:00
-        createBooking(FACILITY_A, base.plusHours(1), base.plusHours(3)); // 11:00–13:00  ← preklapa
+        createBooking(FACILITY_A, base.plusHours(1), base.plusHours(3)); // 11:00–13:00  ← overlaps
 
         List<BookingResponseDTO> conflicts = getConflicting(FACILITY_A, base, base.plusHours(3));
 
@@ -117,10 +117,10 @@ class BookingConflictFlowIT {
     void recurringCreation_shouldFailWithBadRequest_whenFirstOccurrenceConflicts() {
         LocalDateTime base = LocalDateTime.now().plusDays(9).withHour(10).withMinute(0).withSecond(0).withNano(0);
 
-        // Zauzmi termin ručno (PENDING)
+        // Book slot manually (PENDING)
         createBooking(FACILITY_A, base, base.plusHours(2));
 
-        // Pokušaj kreirati recurring za isti termin → conflict na prvoj iteraciji
+        // Try to create recurring for same slot → conflict on first occurrence
         String url = UriComponentsBuilder.fromPath("/api/bookings/recurring")
                 .queryParam("pattern", "WEEKLY").queryParam("occurrences", "3")
                 .toUriString();
@@ -134,7 +134,7 @@ class BookingConflictFlowIT {
                 String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        // Samo originalna rezervacija, nijedna recurring nije kreirana
+        // Only original booking exists, no recurring ones were created
         assertThat(bookingRepository.count()).isEqualTo(1);
     }
 
@@ -143,7 +143,7 @@ class BookingConflictFlowIT {
         LocalDateTime base = LocalDateTime.now().plusDays(10).withHour(10).withMinute(0).withSecond(0).withNano(0);
 
         createBooking(FACILITY_A, base, base.plusHours(2));
-        createBooking(FACILITY_B, base, base.plusHours(2)); // isti termin, drugi teren
+        createBooking(FACILITY_B, base, base.plusHours(2)); // same slot, different facility
 
         List<BookingResponseDTO> conflictsA = getConflicting(FACILITY_A, base, base.plusHours(2));
         List<BookingResponseDTO> conflictsB = getConflicting(FACILITY_B, base, base.plusHours(2));

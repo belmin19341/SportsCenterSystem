@@ -1,12 +1,12 @@
 package ba.nwt.userservice.security;
 
-import org.springframework.core.io.DefaultResourceLoader;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.ResourceLoader;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.security.KeyFactory;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
@@ -14,56 +14,142 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 
-/**
- * Minimal PEM loader for RSA keys.
- *
- * <p>Reads PKCS#8 private keys and X.509 SubjectPublicKeyInfo public keys
- * exported by {@code openssl}. No BouncyCastle dependency required — the
- * standard JDK {@code KeyFactory} understands both encodings once the PEM
- * envelope and whitespace are stripped.</p>
- *
- * <p>Supported locations (Spring resource syntax):
- * {@code classpath:keys/jwt-private.pem}, {@code file:/etc/keys/...},
- * or a plain filesystem path.</p>
- */
+@Slf4j
 final class PemKeyLoader {
-
-    private static final ResourceLoader RESOURCES = new DefaultResourceLoader();
 
     private PemKeyLoader() {}
 
+    /**
+     * Load RSA private key from filesystem.
+     * Fails startup with clear error if file does not exist.
+     */
     static RSAPrivateKey loadPrivate(String location) {
-        byte[] der = readPemDer(location, "PRIVATE KEY");
         try {
-            return (RSAPrivateKey) KeyFactory.getInstance("RSA")
+            log.info("Loading JWT private key from: {}", location);
+
+            // Support preferred filesystem paths, with a tolerant fallback to classpath
+            if (location != null && location.startsWith("classpath:")) {
+                String resourcePath = location.substring("classpath:".length());
+                try (InputStream in = PemKeyLoader.class.getClassLoader().getResourceAsStream(resourcePath)) {
+                    if (in == null) {
+                        String errorMsg = "FATAL: JWT private key not found on classpath: " + resourcePath;
+                        log.error(errorMsg);
+                        throw new IllegalStateException(errorMsg);
+                    }
+                    byte[] der = readPemDerFromStream(in, "PRIVATE KEY");
+                    RSAPrivateKey key = (RSAPrivateKey) KeyFactory.getInstance("RSA")
+                            .generatePrivate(new PKCS8EncodedKeySpec(der));
+                    log.info("Successfully loaded JWT private key from classpath: {}", resourcePath);
+                    return key;
+                }
+            }
+
+            String filePath = stripScheme(location);
+            // Validate file exists
+            if (!Files.exists(Paths.get(filePath))) {
+                String errorMsg = String.format(
+                    "FATAL: JWT private key not found at '%s'. Please ensure the key exists at this filesystem path.",
+                    filePath
+                );
+                log.error(errorMsg);
+                throw new IllegalStateException(errorMsg);
+            }
+
+            byte[] der = readPemDer(filePath, "PRIVATE KEY");
+            RSAPrivateKey key = (RSAPrivateKey) KeyFactory.getInstance("RSA")
                     .generatePrivate(new PKCS8EncodedKeySpec(der));
+
+            log.info("Successfully loaded JWT private key from: {}", filePath);
+            return key;
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to load RSA private key from " + location, e);
+            String errorMsg = "Cannot load JWT private key: " + location;
+            log.error(errorMsg, e);
+            throw new IllegalStateException(errorMsg, e);
         }
     }
 
+    /**
+     * Load RSA public key from filesystem.
+     * Fails startup with clear error if file does not exist.
+     */
     static RSAPublicKey loadPublic(String location) {
-        byte[] der = readPemDer(location, "PUBLIC KEY");
         try {
-            return (RSAPublicKey) KeyFactory.getInstance("RSA")
+            log.info("Loading JWT public key from: {}", location);
+
+            if (location != null && location.startsWith("classpath:")) {
+                String resourcePath = location.substring("classpath:".length());
+                try (InputStream in = PemKeyLoader.class.getClassLoader().getResourceAsStream(resourcePath)) {
+                    if (in == null) {
+                        String errorMsg = "FATAL: JWT public key not found on classpath: " + resourcePath;
+                        log.error(errorMsg);
+                        throw new IllegalStateException(errorMsg);
+                    }
+                    byte[] der = readPemDerFromStream(in, "PUBLIC KEY");
+                    RSAPublicKey key = (RSAPublicKey) KeyFactory.getInstance("RSA")
+                            .generatePublic(new X509EncodedKeySpec(der));
+                    log.info("Successfully loaded JWT public key from classpath: {}", resourcePath);
+                    return key;
+                }
+            }
+
+            String filePath = stripScheme(location);
+            log.info("Loading JWT public key from: {}", filePath);
+
+            // Validate file exists
+            if (!Files.exists(Paths.get(filePath))) {
+                String errorMsg = String.format(
+                    "FATAL: JWT public key not found at '%s'. Please ensure the key exists at this filesystem path.",
+                    filePath
+                );
+                log.error(errorMsg);
+                throw new IllegalStateException(errorMsg);
+            }
+
+            byte[] der = readPemDer(filePath, "PUBLIC KEY");
+            RSAPublicKey key = (RSAPublicKey) KeyFactory.getInstance("RSA")
                     .generatePublic(new X509EncodedKeySpec(der));
+
+            log.info("Successfully loaded JWT public key from: {}", filePath);
+            return key;
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to load RSA public key from " + location, e);
+            String errorMsg = "Cannot load JWT public key: " + location;
+            log.error(errorMsg, e);
+            throw new IllegalStateException(errorMsg, e);
         }
     }
 
-    private static byte[] readPemDer(String location, String label) {
-        Resource resource = RESOURCES.getResource(location);
-        try (InputStream in = resource.getInputStream()) {
-            String pem = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-            String base64 = pem
-                    .replace("-----BEGIN " + label + "-----", "")
-                    .replace("-----END " + label + "-----", "")
-                    .replaceAll("\\s", "");
-            return Base64.getDecoder().decode(base64);
-        } catch (IOException e) {
-            throw new IllegalStateException("Cannot read key from " + location, e);
+    /**
+     * Strip 'file:' or 'classpath:' prefix from location path.
+     */
+    private static String stripScheme(String location) {
+        if (location == null) {
+            return "";
         }
+        if (location.startsWith("file:")) {
+            return location.substring(5);
+        }
+        // leave classpath: values untouched here so callers can handle them explicitly
+        return location;
+    }
+
+    private static byte[] readPemDerFromStream(InputStream in, String label) throws IOException {
+        String pem = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        String base64 = pem
+                .replace("-----BEGIN " + label + "-----", "")
+                .replace("-----END " + label + "-----", "")
+                .replaceAll("\\s+", "");
+        return Base64.getDecoder().decode(base64);
+    }
+
+    /**
+     * Read PEM file and extract DER-encoded key bytes.
+     */
+    private static byte[] readPemDer(String filePath, String label) throws IOException {
+        String pem = new String(Files.readAllBytes(Paths.get(filePath)), StandardCharsets.UTF_8);
+        String base64 = pem
+                .replace("-----BEGIN " + label + "-----", "")
+                .replace("-----END " + label + "-----", "")
+                .replaceAll("\\s+", "");
+        return Base64.getDecoder().decode(base64);
     }
 }
-

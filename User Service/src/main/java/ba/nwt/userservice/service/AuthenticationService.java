@@ -2,8 +2,12 @@ package ba.nwt.userservice.service;
 
 import ba.nwt.userservice.dto.AuthResponseDTO;
 import ba.nwt.userservice.dto.LoginRequestDTO;
+import ba.nwt.userservice.dto.RegisterRequestDTO;
+import ba.nwt.userservice.exception.UserAlreadyExistsException;
 import ba.nwt.userservice.exception.ResourceNotFoundException;
 import ba.nwt.userservice.model.User;
+import ba.nwt.userservice.model.UserLoyalty;
+import ba.nwt.userservice.repository.UserLoyaltyRepository;
 import ba.nwt.userservice.repository.UserRepository;
 import ba.nwt.userservice.security.GatewayRevokeClient;
 import ba.nwt.userservice.security.JwtTokenProvider;
@@ -30,12 +34,60 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthenticationService {
 
     private final UserRepository userRepository;
+    private final UserLoyaltyRepository userLoyaltyRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final GatewayRevokeClient gatewayRevokeClient;
     private final RefreshTokenBlacklist refreshBlacklist;
 
     /* ────────────────────────────────────────────────────────────────────── */
+
+    /**
+     * Registers a new user with strict uniqueness checks for username and email.
+     * Password is encrypted using BCrypt. Role is forced to USER.
+     */
+    @Transactional
+    public AuthResponseDTO register(RegisterRequestDTO request) {
+        log.info("Registration attempt for username: {}", request.getUsername());
+
+        if (userRepository.existsByUsername(request.getUsername())) {
+            throw new UserAlreadyExistsException("Username '" + request.getUsername() + "' is already taken.");
+        }
+
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new UserAlreadyExistsException("Account with email '" + request.getEmail() + "' already exists.");
+        }
+
+        User user = User.builder()
+                .username(request.getUsername())
+                .email(request.getEmail())
+                .passwordHash(passwordEncoder.encode(request.getPassword()))
+                .role(User.Role.USER) // Enforce USER role for public registration
+                .build();
+
+        User savedUser = userRepository.save(user);
+
+        userLoyaltyRepository.save(
+            UserLoyalty.builder()
+                .user(savedUser)
+                .totalPoints(0)
+                .tier(UserLoyalty.LoyaltyTier.BRONZE)
+                .build()
+        );
+
+        String access = jwtTokenProvider.generateAccessToken(
+                savedUser.getId(), savedUser.getUsername(), savedUser.getEmail(), savedUser.getRole().name());
+        String refresh = jwtTokenProvider.generateRefreshToken(
+                savedUser.getId(), savedUser.getUsername(), savedUser.getRole().name());
+
+        log.info("User registered successfully: {}", savedUser.getUsername());
+        return new AuthResponseDTO(
+                access, refresh,
+                savedUser.getId(), savedUser.getUsername(), savedUser.getEmail(), savedUser.getRole().name(),
+                jwtTokenProvider.getAccessTokenExpirationSec(),
+                jwtTokenProvider.getRefreshTokenExpirationSec()
+        );
+    }
 
     @Transactional
     public AuthResponseDTO authenticate(LoginRequestDTO loginRequest) {

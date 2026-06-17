@@ -1,5 +1,9 @@
 package ba.nwt.bookingservice.service;
 
+import ba.nwt.bookingservice.client.PaymentServiceClient;
+import ba.nwt.bookingservice.client.ResourceServiceClient;
+import ba.nwt.bookingservice.client.UserServiceClient;
+import ba.nwt.bookingservice.client.dto.FacilityView;
 import ba.nwt.bookingservice.config.JsonPatchUtil;
 import ba.nwt.bookingservice.dto.BookingRequestDTO;
 import ba.nwt.bookingservice.dto.BookingResponseDTO;
@@ -24,6 +28,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -34,6 +39,9 @@ class BookingServiceZ4Test {
     @Mock private BookingUserRepository bookingUserRepository;
     @Mock private ModelMapper modelMapper;
     @Mock private JsonPatchUtil jsonPatchUtil;
+    @Mock private ResourceServiceClient resourceServiceClient;
+    @Mock private PaymentServiceClient paymentServiceClient;
+    @Mock private UserServiceClient userServiceClient;
 
     @InjectMocks private BookingService bookingService;
 
@@ -47,9 +55,12 @@ class BookingServiceZ4Test {
     }
 
     @BeforeEach
-    void initMapper() {
-        org.mockito.Mockito.lenient()
-                .when(modelMapper.map(any(Booking.class), eq(BookingResponseDTO.class)))
+    void initMocks() {
+        // Return a facility with no working-hours constraints so validation is bypassed
+        lenient().when(resourceServiceClient.getFacility(anyLong()))
+                .thenReturn(new FacilityView());
+
+        lenient().when(modelMapper.map(any(Booking.class), eq(BookingResponseDTO.class)))
                 .thenReturn(new BookingResponseDTO());
     }
 

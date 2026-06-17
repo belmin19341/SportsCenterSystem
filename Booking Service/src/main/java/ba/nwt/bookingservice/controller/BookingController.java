@@ -2,16 +2,21 @@ package ba.nwt.bookingservice.controller;
 
 import ba.nwt.bookingservice.dto.BookingRequestDTO;
 import ba.nwt.bookingservice.dto.BookingResponseDTO;
+import ba.nwt.bookingservice.dto.GroupBookingRequestDTO;
 import ba.nwt.bookingservice.model.Booking;
 import ba.nwt.bookingservice.service.BookingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -28,17 +33,17 @@ public class BookingController {
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) Long facilityId,
             @RequestParam(required = false) Booking.BookingStatus status,
-            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime from,
-            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime to,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
             @RequestParam(defaultValue = "false") boolean paged,
-            @org.springframework.data.web.PageableDefault(size = 20, sort = "id") org.springframework.data.domain.Pageable pageable) {
+            @PageableDefault(size = 20, sort = "id") Pageable pageable) {
         if (paged || userId != null || facilityId != null || status != null || from != null || to != null) {
             return ResponseEntity.ok(bookingService.search(userId, facilityId, status, from, to, pageable));
         }
         return ResponseEntity.ok(bookingService.getAll());
     }
 
-    @org.springframework.web.bind.annotation.PatchMapping(value = "/{id}", consumes = "application/json-patch+json")
+    @PatchMapping(value = "/{id}", consumes = "application/json-patch+json")
     @Operation(summary = "Partially update a booking (RFC 6902 JSON Patch)")
     public ResponseEntity<BookingResponseDTO> patch(@PathVariable Long id,
                                                     @RequestBody com.github.fge.jsonpatch.JsonPatch patch) {
@@ -49,8 +54,8 @@ public class BookingController {
     @Operation(summary = "Find PENDING/CONFIRMED bookings overlapping the given window for a facility")
     public ResponseEntity<List<BookingResponseDTO>> findConflicting(
             @PathVariable Long facilityId,
-            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime start,
-            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime end) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
         return ResponseEntity.ok(bookingService.findConflicting(facilityId, start, end));
     }
 
@@ -66,19 +71,9 @@ public class BookingController {
 
     @PostMapping("/group")
     @Operation(summary = "Create a group booking with split amounts atomically")
-    public ResponseEntity<BookingResponseDTO> createGroup(
-            @Valid @RequestBody GroupBookingRequest request) {
+    public ResponseEntity<BookingResponseDTO> createGroup(@Valid @RequestBody GroupBookingRequestDTO request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(bookingService.createGroup(request.getBooking(), request.getParticipantUserIds()));
-    }
-
-    @lombok.Getter @lombok.Setter @lombok.NoArgsConstructor @lombok.AllArgsConstructor
-    public static class GroupBookingRequest {
-        @jakarta.validation.Valid
-        @jakarta.validation.constraints.NotNull(message = "Booking payload is required")
-        private BookingRequestDTO booking;
-        @jakarta.validation.constraints.NotEmpty(message = "Participant user IDs are required")
-        private List<Long> participantUserIds;
     }
 
     @GetMapping("/{id}")
@@ -123,7 +118,8 @@ public class BookingController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update a booking")
-    public ResponseEntity<BookingResponseDTO> update(@PathVariable Long id, @Valid @RequestBody BookingRequestDTO dto) {
+    public ResponseEntity<BookingResponseDTO> update(@PathVariable Long id,
+                                                     @Valid @RequestBody BookingRequestDTO dto) {
         return ResponseEntity.ok(bookingService.update(id, dto));
     }
 
@@ -134,4 +130,3 @@ public class BookingController {
         return ResponseEntity.noContent().build();
     }
 }
-

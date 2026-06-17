@@ -24,16 +24,16 @@ public class DataLoader implements CommandLineRunner {
     @Override
     public void run(String... args) {
         if (bookingRepository.count() > 0) {
-            log.info(">>> Podaci već postoje, preskačem DataLoader.");
+            log.info(">>> Data already exists, skipping DataLoader.");
             return;
         }
 
-        log.info(">>> Unosim početne podatke u Booking Service bazu...");
+        log.info(">>> Inserting initial data into Booking Service database...");
 
         // ── Bookings ──
         Booking booking1 = bookingRepository.save(Booking.builder()
                 .userId(3L)  // belmin_d
-                .facilityId(1L)  // Mali teren A
+                .facilityId(1L)  // Small Court A
                 .startTime(LocalDateTime.now().plusDays(2).withHour(18).withMinute(0))
                 .endTime(LocalDateTime.now().plusDays(2).withHour(19).withMinute(0))
                 .totalPrice(new BigDecimal("60.00"))
@@ -53,7 +53,7 @@ public class DataLoader implements CommandLineRunner {
 
         Booking booking3 = bookingRepository.save(Booking.builder()
                 .userId(3L)  // belmin_d
-                .facilityId(1L)  // Mali teren A
+                .facilityId(1L)  // Small Court A
                 .startTime(LocalDateTime.now().plusDays(9).withHour(18).withMinute(0))
                 .endTime(LocalDateTime.now().plusDays(9).withHour(19).withMinute(0))
                 .totalPrice(new BigDecimal("60.00"))
@@ -64,14 +64,14 @@ public class DataLoader implements CommandLineRunner {
 
         Booking pastBooking = bookingRepository.save(Booking.builder()
                 .userId(5L)  // amar_h
-                .facilityId(4L)  // Teniski teren 1
+                .facilityId(4L)  // Tennis Court 1
                 .startTime(LocalDateTime.now().minusDays(5).withHour(16).withMinute(0))
                 .endTime(LocalDateTime.now().minusDays(5).withHour(17).withMinute(0))
                 .totalPrice(new BigDecimal("35.00"))
                 .status(Booking.BookingStatus.COMPLETED)
                 .build());
 
-        // ── Booking Users (grupna rezervacija) ──
+        // ── Booking Users (group booking) ──
         bookingUserRepository.save(BookingUser.builder()
                 .booking(booking1)
                 .userId(3L)
@@ -91,7 +91,7 @@ public class DataLoader implements CommandLineRunner {
         // ── Equipment Rentals ──
         equipmentRentalRepository.save(EquipmentRental.builder()
                 .userId(4L)
-                .equipmentId(2L)  // Bullpadel reket
+                .equipmentId(2L)  // Bullpadel racket
                 .booking(booking2)
                 .startDate(LocalDate.now().plusDays(3))
                 .endDate(LocalDate.now().plusDays(3))
@@ -103,7 +103,7 @@ public class DataLoader implements CommandLineRunner {
 
         equipmentRentalRepository.save(EquipmentRental.builder()
                 .userId(5L)
-                .equipmentId(4L)  // Sobni bicikl — samostalni najam
+                .equipmentId(4L)  // Exercise bike — standalone rental
                 .startDate(LocalDate.now())
                 .endDate(LocalDate.now().plusDays(7))
                 .quantity(1)
@@ -118,7 +118,7 @@ public class DataLoader implements CommandLineRunner {
                 .reviewedEntityId(4L)
                 .reviewedEntityType(Review.ReviewedEntityType.FACILITY)
                 .rating(5)
-                .comment("Odličan teniski teren, super podloga!")
+                .comment("Excellent tennis court, great surface!")
                 .build());
 
         reviewRepository.save(Review.builder()
@@ -126,7 +126,7 @@ public class DataLoader implements CommandLineRunner {
                 .reviewedEntityId(1L)
                 .reviewedEntityType(Review.ReviewedEntityType.FACILITY)
                 .rating(4)
-                .comment("Dobar mali teren, moglo bi bolje osvjetljenje.")
+                .comment("Good small court, could use better lighting.")
                 .build());
 
         reviewRepository.save(Review.builder()
@@ -134,11 +134,10 @@ public class DataLoader implements CommandLineRunner {
                 .reviewedEntityId(2L)
                 .reviewedEntityType(Review.ReviewedEntityType.EQUIPMENT)
                 .rating(5)
-                .comment("Bullpadel reket je fantastičan, preporučujem!")
+                .comment("Bullpadel racket is fantastic, I recommend it!")
                 .build());
 
-        log.info(">>> Booking Service DataLoader završen — {} bookinga, {} rental, {} review.",
+        log.info(">>> Booking Service DataLoader finished — {} bookings, {} rentals, {} reviews.",
                 bookingRepository.count(), equipmentRentalRepository.count(), reviewRepository.count());
     }
 }
-

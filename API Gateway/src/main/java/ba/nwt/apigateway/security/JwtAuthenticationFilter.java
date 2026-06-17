@@ -143,7 +143,8 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
     /**
      * Public routes that bypass JWT validation.
      * <ul>
-     *   <li>{@code /api/auth/login}, {@code /api/auth/refresh} — credential / token exchange</li>
+     *   <li>{@code /api/auth/login}, {@code /api/auth/register} — credential / account creation</li>
+     *   <li>{@code /api/auth/refresh} — token exchange</li>
      *   <li>{@code /api/auth/logout}, {@code /api/auth/validate} — User Service inspects
      *       the Authorization header internally</li>
      *   <li>{@code GET /api/facilities/**}, {@code GET /api/equipment/**} — public catalog data</li>
@@ -157,6 +158,7 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
             return true;
         }
         return path.endsWith("/api/auth/login")
+                || path.endsWith("/api/auth/register")
                 || path.endsWith("/api/auth/refresh")
                 || path.endsWith("/api/auth/logout")
                 || path.endsWith("/api/auth/validate")

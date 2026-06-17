@@ -12,7 +12,8 @@ const defaultPaymentMethod: PaymentMethod = 'CREDIT_CARD'
 const paymentMethods = [
 	'CREDIT_CARD',
 	'DEBIT_CARD',
-	'PAYPAL'
+	'PAYPAL',
+	'CASH'
 ] satisfies PaymentMethod[]
 
 function isPaymentMethod(value: unknown): value is PaymentMethod {

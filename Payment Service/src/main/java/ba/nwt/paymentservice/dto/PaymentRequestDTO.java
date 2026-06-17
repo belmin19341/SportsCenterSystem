@@ -24,5 +24,12 @@ public class PaymentRequestDTO {
     private Payment.PaymentMethod paymentMethod;
 
     private Payment.PaymentStatus status;
+
+    // Stripe payment fields (optional — omit for auto-approve fallback)
+    private String stripeToken;   // tok_xxx from Stripe.js (one-time charge or new card)
+    private Long savedCardId;     // ID of a previously saved SavedCard
+    private Boolean saveCard;     // whether to persist card for future use
+    private String cardLast4;     // sent by frontend alongside stripeToken
+    private String cardBrand;     // sent by frontend alongside stripeToken
 }
 

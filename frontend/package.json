@@ -20,6 +20,8 @@
 		"validate": "pnpm lint && pnpm test:ci && pnpm build"
 	},
 	"dependencies": {
+		"@stripe/react-stripe-js": "^6.6.0",
+		"@stripe/stripe-js": "^9.8.0",
 		"@tanstack/react-query": "5.95.2",
 		"@tanstack/react-query-devtools": "5.95.2",
 		"class-variance-authority": "0.7.1",

@@ -15,21 +15,21 @@ export function listUserBookings(userId: number) {
 	return requestJson<BookingResponse[]>(`/api/bookings/user/${userId}`)
 }
 
-export function createBooking(
-	input: BookingRequest & {
-		paymentMethod: PaymentMethod
-	}
-) {
-	const {paymentMethod, ...payload} = input
-	const searchParams = new URLSearchParams({paymentMethod})
+export function createBooking(input: BookingRequest) {
+	return requestJson<BookingResponse>('/api/bookings/orchestrated', {
+		body: input,
+		method: 'POST'
+	})
+}
 
-	return requestJson<BookingResponse>(
-		`/api/bookings/orchestrated?${searchParams.toString()}`,
-		{
-			body: payload,
-			method: 'POST'
-		}
+export function getSavedCards(userId: number) {
+	return requestJson<import('@/types/api').SavedCardResponse[]>(
+		`/api/payments/saved-cards/user/${userId}`
 	)
+}
+
+export function deleteSavedCard(id: number) {
+	return requestJson<void>(`/api/payments/saved-cards/${id}`, {method: 'DELETE'})
 }
 
 export function listConflictingBookings(input: {

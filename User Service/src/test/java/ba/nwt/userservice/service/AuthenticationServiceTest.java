@@ -3,6 +3,7 @@ package ba.nwt.userservice.service;
 import ba.nwt.userservice.dto.AuthResponseDTO;
 import ba.nwt.userservice.dto.LoginRequestDTO;
 import ba.nwt.userservice.model.User;
+import ba.nwt.userservice.repository.UserLoyaltyRepository;
 import ba.nwt.userservice.repository.UserRepository;
 import ba.nwt.userservice.security.GatewayRevokeClient;
 import ba.nwt.userservice.security.JwtTokenProvider;
@@ -32,6 +33,9 @@ class AuthenticationServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private UserLoyaltyRepository userLoyaltyRepository;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     @Mock
@@ -49,6 +53,7 @@ class AuthenticationServiceTest {
     void setUp() {
         authenticationService = new AuthenticationService(
                 userRepository,
+                userLoyaltyRepository,
                 passwordEncoder,
                 jwtTokenProvider,
                 gatewayRevokeClient,

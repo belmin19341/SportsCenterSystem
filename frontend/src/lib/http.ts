@@ -7,10 +7,11 @@ import {
 } from '@/auth/authStorage'
 import type {ApiErrorPayload, AuthResponse, StoredSession} from '@/types/api'
 
-const DEFAULT_API_BASE_URL = 'http://localhost:8080'
-const apiBaseUrl = (
-	import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL
-).replace(/\/$/u, '')
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/u, '')
+
+if (!apiBaseUrl) {
+	throw new Error('VITE_API_BASE_URL is not defined. This variable is mandatory for the frontend to function.')
+}
 
 export class ApiError extends Error {
 	details?: string[]

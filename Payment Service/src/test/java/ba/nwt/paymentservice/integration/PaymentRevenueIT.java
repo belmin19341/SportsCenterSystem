@@ -2,10 +2,10 @@ package ba.nwt.paymentservice.integration;
 
 import ba.nwt.paymentservice.dto.PaymentRequestDTO;
 import ba.nwt.paymentservice.dto.PaymentResponseDTO;
+import ba.nwt.paymentservice.dto.RevenueReportDTO;
 import ba.nwt.paymentservice.model.Payment;
 import ba.nwt.paymentservice.repository.NotificationRepository;
 import ba.nwt.paymentservice.repository.PaymentRepository;
-import ba.nwt.paymentservice.service.PaymentService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -21,8 +21,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -59,12 +57,12 @@ class PaymentRevenueIT {
                 PaymentResponseDTO.class);
     }
 
-    private PaymentService.RevenueReport getRevenue(LocalDateTime from, LocalDateTime to) {
+    private RevenueReportDTO getRevenue(LocalDateTime from, LocalDateTime to) {
         String url = UriComponentsBuilder.fromPath("/api/payments/revenue")
                 .queryParam("from", from.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
                 .queryParam("to", to.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
                 .toUriString();
-        return restTemplate.getForObject(url, PaymentService.RevenueReport.class);
+        return restTemplate.getForObject(url, RevenueReportDTO.class);
     }
 
     @Test
@@ -78,7 +76,7 @@ class PaymentRevenueIT {
                         .status(Payment.PaymentStatus.PENDING).build(),
                 PaymentResponseDTO.class);
 
-        PaymentService.RevenueReport report = getRevenue(
+        RevenueReportDTO report = getRevenue(
                 LocalDateTime.now().minusMinutes(5), LocalDateTime.now().plusMinutes(5));
 
         assertThat(report.getTotalRevenue()).isEqualByComparingTo("300.00");
@@ -90,19 +88,19 @@ class PaymentRevenueIT {
         createPaidPayment(new BigDecimal("70.00"),  Payment.PaymentMethod.CREDIT_CARD);
         createPaidPayment(new BigDecimal("120.00"), Payment.PaymentMethod.PAYPAL);
 
-        PaymentService.RevenueReport report = getRevenue(
+        RevenueReportDTO report = getRevenue(
                 LocalDateTime.now().minusMinutes(5), LocalDateTime.now().plusMinutes(5));
 
         assertThat(report.getTotalRevenue()).isEqualByComparingTo("240.00");
         assertThat(report.getByMethod()).hasSize(2);
 
-        PaymentService.RevenueByMethod card = report.getByMethod().stream()
+        RevenueReportDTO.RevenueByMethodDTO card = report.getByMethod().stream()
                 .filter(r -> r.getMethod() == Payment.PaymentMethod.CREDIT_CARD)
                 .findFirst().orElseThrow();
         assertThat(card.getTotal()).isEqualByComparingTo("120.00");
         assertThat(card.getCount()).isEqualTo(2);
 
-        PaymentService.RevenueByMethod paypal = report.getByMethod().stream()
+        RevenueReportDTO.RevenueByMethodDTO paypal = report.getByMethod().stream()
                 .filter(r -> r.getMethod() == Payment.PaymentMethod.PAYPAL)
                 .findFirst().orElseThrow();
         assertThat(paypal.getTotal()).isEqualByComparingTo("120.00");
@@ -114,7 +112,7 @@ class PaymentRevenueIT {
         createPaidPayment(new BigDecimal("500.00"), Payment.PaymentMethod.CREDIT_CARD);
 
         // Traži u opsegu koji je daleko u prošlosti
-        PaymentService.RevenueReport report = getRevenue(
+        RevenueReportDTO report = getRevenue(
                 LocalDateTime.now().minusDays(30), LocalDateTime.now().minusDays(29));
 
         assertThat(report.getTotalRevenue()).isEqualByComparingTo("0.00");

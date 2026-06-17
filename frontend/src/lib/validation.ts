@@ -62,6 +62,31 @@ export function validateLoginForm(input: {password: string; username: string}) {
 	return errors
 }
 
+export function validateRegisterForm(form: {
+	username?: string
+	email?: string
+	password?: string
+}) {
+	const errors: string[] = []
+
+	if (!form.username || form.username.trim().length < MIN_USERNAME_LENGTH) {
+		errors.push(`Username must be at least ${MIN_USERNAME_LENGTH} characters long.`)
+	} else if (form.username.length > 50) {
+		errors.push('Username cannot exceed 50 characters.')
+	}
+
+	const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+	if (!form.email || !emailRegex.test(form.email)) {
+		errors.push('Please enter a valid email address.')
+	}
+
+	if (!form.password || form.password.length < 8) {
+		errors.push('Password must be at least 8 characters long.')
+	}
+
+	return errors
+}
+
 export function validateBookingForm(input: BookingValidationInput) {
 	const errors: string[] = []
 	const start = getLocalDate(input.startTime)
@@ -122,6 +147,56 @@ export function validateBookingForm(input: BookingValidationInput) {
 	return errors
 }
 
+/**
+ * Validate only time-related constraints (before fetching price quote)
+ * Returns errors that prevent the quote API call
+ */
+export function validateBookingTimeOnly(
+	input: Omit<BookingValidationInput, 'quote'> & {facility: FacilityResponse | null | undefined}
+) {
+	const errors: string[] = []
+	const start = getLocalDate(input.startTime)
+	const end = getLocalDate(input.endTime)
+
+	if (!input.facility) {
+		return errors // Silent - not needed for quote validation
+	}
+
+	if (!start || !end) {
+		return errors // Silent - inputs not ready yet
+	}
+
+	if (start.valueOf() <= Date.now()) {
+		errors.push('Start time must be in the future.')
+	}
+
+	if (end.valueOf() <= start.valueOf()) {
+		errors.push('End time must be after start time.')
+	}
+
+	const open = getMinutes(input.facility.workingHoursStart)
+	const close = getMinutes(input.facility.workingHoursEnd)
+	const requestedStart = getDateTimeMinutes(input.startTime)
+	const requestedEnd = getDateTimeMinutes(input.endTime)
+
+	if (
+		open !== null &&
+		close !== null &&
+		requestedStart !== null &&
+		requestedEnd !== null &&
+		(requestedStart < open || requestedEnd > close)
+	) {
+		errors.push(
+			`Selected time must fit facility hours (${formatTimeRange(
+				input.facility.workingHoursStart,
+				input.facility.workingHoursEnd
+			)}).`
+		)
+	}
+
+	return errors
+}
+
 export function validateFacilityForm(input: FacilityRequest) {
 	const errors: string[] = []
 
@@ -162,4 +237,70 @@ export function validateReviewForm(input: ReviewValidationInput) {
 	}
 
 	return errors
+}
+
+// ── Per-field validators ──────────────────────────────────────────────────────
+
+export function validateUsernameField(value: string): string | null {
+	const trimmed = value.trim()
+	if (!trimmed) return 'Username is required.'
+	if (trimmed.length < 3) return 'Username must be at least 3 characters.'
+	if (trimmed.length > 50) return 'Username cannot exceed 50 characters.'
+	return null
+}
+
+export function validateEmailField(value: string): string | null {
+	if (!value.trim()) return 'Email is required.'
+	if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()))
+		return 'Enter a valid email address.'
+	return null
+}
+
+export function validatePasswordField(
+	value: string,
+	minLength = 8
+): string | null {
+	if (!value) return 'Password is required.'
+	if (value.length < minLength)
+		return `Password must be at least ${minLength} characters.`
+	return null
+}
+
+export function validateConfirmPasswordField(
+	password: string,
+	confirm: string
+): string | null {
+	if (!confirm) return 'Please confirm your password.'
+	if (password !== confirm) return 'Passwords do not match.'
+	return null
+}
+
+export function validateFacilityNameField(value: string): string | null {
+	const trimmed = value.trim()
+	if (!trimmed) return 'Facility name is required.'
+	if (trimmed.length > 200) return 'Name must be at most 200 characters.'
+	return null
+}
+
+export function validateCapacityField(value: number): string | null {
+	if (!value || value < 1) return 'Capacity must be at least 1.'
+	return null
+}
+
+export function validateBasePriceField(value: number): string | null {
+	if (!value || Number(value) <= 0) return 'Base price must be greater than 0.'
+	return null
+}
+
+export function validateWorkingHoursField(
+	start: string,
+	end: string
+): string | null {
+	if (!start) return 'Opening time is required.'
+	if (!end) return 'Closing time is required.'
+	const openMin = getMinutes(start)
+	const closeMin = getMinutes(end)
+	if (openMin === null || closeMin === null) return 'Enter valid times.'
+	if (closeMin <= openMin) return 'Closing time must be after opening time.'
+	return null
 }

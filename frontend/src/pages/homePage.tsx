@@ -1,7 +1,5 @@
-import {useQuery} from '@tanstack/react-query'
-import {useState} from 'react'
 import {Link} from 'react-router'
-import {useAuth} from '@/auth/authContext'
+import {useHomeData} from '@/hooks/useHomeData'
 import {LoadingOrError} from '@/components/loadingOrError'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
@@ -12,7 +10,6 @@ import {
 	CardHeader,
 	CardTitle
 } from '@/components/ui/card'
-import {listEquipment, listFacilities} from '@/features/resources/api'
 import {formatCurrency} from '@/lib/format'
 import {formatTimeRange} from '@/lib/localDateTime'
 import type {FacilityStatus, FacilityType} from '@/types/api'
@@ -36,23 +33,15 @@ const facilityStatuses = [
 ] satisfies FacilityStatus[]
 
 export function HomePage() {
-	const {isSignedIn} = useAuth()
-	const [filters, setFilters] = useState<{
-		q: string
-		status: FacilityStatus | ''
-		type: FacilityType | ''
-	}>({q: '', status: 'ACTIVE', type: ''})
-	const facilitiesQuery = useQuery({
-		queryFn: () => listFacilities(filters),
-		queryKey: ['facilities', filters]
-	})
-	const equipmentQuery = useQuery({
-		queryFn: listEquipment,
-		queryKey: ['equipment']
-	})
-
-	const facilities = facilitiesQuery.data || []
-	const equipment = equipmentQuery.data?.slice(0, 6) || []
+	const {
+		isSignedIn,
+		filters,
+		setFilters,
+		facilitiesQuery,
+		equipmentQuery,
+		facilities,
+		equipment
+	} = useHomeData();
 
 	return (
 		<div className='space-y-8 sm:space-y-10'>
@@ -72,12 +61,19 @@ export function HomePage() {
 					<CardContent className='flex flex-col gap-3 sm:flex-row sm:flex-wrap'>
 						<Link
 							className='w-full sm:w-auto'
-							to={isSignedIn ? '/bookings/new' : '/login'}
+							to={isSignedIn ? '/bookings/new' : '/register'}
 						>
 							<Button className='w-full sm:w-auto' size='lg'>
-								{isSignedIn ? 'Create a booking' : 'Sign in to continue'}
+								{isSignedIn ? 'Create a booking' : 'Get started'}
 							</Button>
 						</Link>
+						{!isSignedIn && (
+							<Link className='w-full sm:w-auto' to='/login'>
+								<Button className='w-full sm:w-auto' size='lg' variant='outline'>
+									Sign in
+								</Button>
+							</Link>
+						)}
 						{isSignedIn ? (
 							<Link className='w-full sm:w-auto' to='/dashboard'>
 								<Button

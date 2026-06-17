@@ -1,8 +1,6 @@
-import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {type FormEvent, useEffect, useMemo, useState} from 'react'
-import {useNavigate, useSearchParams} from 'react-router'
-import {useAuth} from '@/auth/authContext'
-import {useFeedback} from '@/components/feedback'
+import {Elements} from '@stripe/react-stripe-js'
+import {loadStripe} from '@stripe/stripe-js'
+import {useBookingData} from '@/hooks/useBookingData'
 import {LoadingOrError} from '@/components/loadingOrError'
 import {Alert} from '@/components/ui/alert'
 import {Button} from '@/components/ui/button'
@@ -13,211 +11,32 @@ import {
 	CardHeader,
 	CardTitle
 } from '@/components/ui/card'
-import {createBooking, listConflictingBookings} from '@/features/bookings/api'
 import {BookingBasicsFields} from '@/features/bookings/bookingBasicsFields'
-import {
-	type BookingDraft,
-	clearBookingDraft,
-	createInitialBookingDraft,
-	saveBookingDraft
-} from '@/features/bookings/bookingDraft'
 import {BookingScheduleFields} from '@/features/bookings/bookingScheduleFields'
-import {
-	applyStartTimeToDraft,
-	createMinimumBookingDateTime,
-	getMinimumEndDateTime
-} from '@/features/bookings/bookingScheduleLogic'
+import {PaymentForm} from '@/features/bookings/paymentForm'
 import {
 	formatDuration,
 	formatRateSummary
 } from '@/features/bookings/pricingCopy'
 import {SelectedFacilitySummary} from '@/features/bookings/selectedFacilitySummary'
-import {isValidDateRange} from '@/features/bookings/timeRange'
-import {getFacilityPriceQuote, listFacilities} from '@/features/resources/api'
-import {formatCurrency, getErrorMessage} from '@/lib/format'
-import {validateBookingForm} from '@/lib/validation'
+import {formatCurrency} from '@/lib/format'
+
+const publishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined
+const stripePromise = publishableKey ? loadStripe(publishableKey) : null
+
+const elementsOptions = {
+	appearance: {theme: 'night' as const}
+}
 
 export function BookingPage() {
-	const {session} = useAuth()
-	const {showFeedback} = useFeedback()
-	const navigate = useNavigate()
-	const [searchParams] = useSearchParams()
-	const requestedFacilityId = searchParams.get('facilityId') || ''
-	const queryClient = useQueryClient()
-	const [errorMessage, setErrorMessage] = useState<string | null>(null)
-	const [hasSubmitted, setHasSubmitted] = useState(false)
-	const [form, setForm] = useState<BookingDraft>(() =>
-		createInitialBookingDraft(requestedFacilityId)
-	)
+	const {
+		form, setForm, facilitiesQuery, savedCardsQuery, paymentFormRef,
+		quoteQuery, conflictsQuery, selectedFacility,
+		isTimeRangeValid, minimumBookingDateTime, minimumEndDateTime, bookingValidationErrors,
+		errorMessage, hasSubmitted, handleStartTimeChange, handleSubmit, isPending
+	} = useBookingData()
 
-	useEffect(() => {
-		if (!requestedFacilityId) {
-			return
-		}
-
-		setForm(currentForm =>
-			currentForm.facilityId === requestedFacilityId
-				? currentForm
-				: {...currentForm, facilityId: requestedFacilityId}
-		)
-	}, [requestedFacilityId])
-
-	useEffect(() => {
-		saveBookingDraft(form)
-	}, [form])
-
-	const facilitiesQuery = useQuery({
-		queryFn: () => listFacilities(),
-		queryKey: ['facilities']
-	})
-
-	const isTimeRangeValid = useMemo(
-		() => isValidDateRange(form.startTime, form.endTime),
-		[form.endTime, form.startTime]
-	)
-
-	const quoteQuery = useQuery({
-		enabled: Boolean(form.facilityId) && isTimeRangeValid,
-		queryFn: () =>
-			getFacilityPriceQuote({
-				end: form.endTime,
-				facilityId: Number(form.facilityId),
-				start: form.startTime
-			}),
-		queryKey: ['price-quote', form.facilityId, form.startTime, form.endTime]
-	})
-	const conflictsQuery = useQuery({
-		enabled: Boolean(form.facilityId) && isTimeRangeValid,
-		queryFn: () =>
-			listConflictingBookings({
-				end: form.endTime,
-				facilityId: Number(form.facilityId),
-				start: form.startTime
-			}),
-		queryKey: [
-			'booking-conflicts',
-			form.facilityId,
-			form.startTime,
-			form.endTime
-		]
-	})
-
-	const selectedFacility = useMemo(
-		() =>
-			(facilitiesQuery.data || []).find(
-				facility => String(facility.id) === form.facilityId
-			),
-		[facilitiesQuery.data, form.facilityId]
-	)
-	const minimumBookingDateTime = useMemo(createMinimumBookingDateTime, [])
-	const minimumEndDateTime = getMinimumEndDateTime(
-		form.startTime,
-		minimumBookingDateTime
-	)
-	const bookingValidationErrors = useMemo(
-		() =>
-			validateBookingForm({
-				conflictCount: conflictsQuery.data?.length ?? 0,
-				endTime: form.endTime,
-				facility: selectedFacility,
-				quote: quoteQuery.data,
-				startTime: form.startTime
-			}),
-		[
-			conflictsQuery.data?.length,
-			form.endTime,
-			form.startTime,
-			quoteQuery.data,
-			selectedFacility
-		]
-	)
-
-	function handleStartTimeChange(nextStartTime: string) {
-		setForm(currentForm =>
-			applyStartTimeToDraft(
-				currentForm,
-				nextStartTime,
-				selectedFacility?.workingHoursEnd
-			)
-		)
-	}
-
-	const bookingMutation = useMutation({
-		mutationFn: () => {
-			const validationErrors = validateBookingForm({
-				conflictCount: conflictsQuery.data?.length ?? 0,
-				endTime: form.endTime,
-				facility: selectedFacility,
-				quote: quoteQuery.data,
-				startTime: form.startTime
-			})
-
-			if (validationErrors.length > 0) {
-				throw new Error(validationErrors.join(' '))
-			}
-
-			if (!session) {
-				throw new Error('You must be signed in to create a booking.')
-			}
-
-			if (!selectedFacility) {
-				throw new Error('Choose a facility before continuing.')
-			}
-
-			if (!quoteQuery.data) {
-				throw new Error('A valid price quote is required before booking.')
-			}
-
-			return createBooking({
-				endTime: form.endTime,
-				facilityId: selectedFacility.id,
-				isRecurring: false,
-				paymentMethod: form.paymentMethod,
-				recurringPattern: null,
-				startTime: form.startTime,
-				status: 'PENDING',
-				totalPrice: quoteQuery.data.totalPrice,
-				userId: session.userId
-			})
-		},
-		async onSuccess() {
-			clearBookingDraft()
-			await queryClient.invalidateQueries({
-				queryKey: ['bookings', session?.userId]
-			})
-			await queryClient.invalidateQueries({queryKey: ['payments']})
-			await queryClient.invalidateQueries({
-				queryKey: ['loyalty', session?.userId]
-			})
-			await queryClient.invalidateQueries({
-				queryKey: ['notifications', session?.userId]
-			})
-			showFeedback({
-				description:
-					'The booking, payment, loyalty, and notification data were refreshed.',
-				title: 'Booking created',
-				variant: 'success'
-			})
-			navigate('/dashboard')
-		}
-	})
-
-	async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-		event.preventDefault()
-		setHasSubmitted(true)
-		setErrorMessage(null)
-
-		if (bookingValidationErrors.length > 0) {
-			setErrorMessage(bookingValidationErrors.join(' '))
-			return
-		}
-
-		try {
-			await bookingMutation.mutateAsync()
-		} catch (error) {
-			setErrorMessage(getErrorMessage(error))
-		}
-	}
+	const savedCards = savedCardsQuery.data ?? []
 
 	return (
 		<div className='mx-auto w-full max-w-4xl space-y-5 sm:space-y-6'>
@@ -244,13 +63,6 @@ export function BookingPage() {
 										facilityId: nextFacilityId
 									}))
 								}
-								onChangePaymentMethod={nextPaymentMethod =>
-									setForm(currentForm => ({
-										...currentForm,
-										paymentMethod: nextPaymentMethod
-									}))
-								}
-								paymentMethod={form.paymentMethod}
 							/>
 
 							<BookingScheduleFields
@@ -316,6 +128,17 @@ export function BookingPage() {
 								<SelectedFacilitySummary facility={selectedFacility} />
 							) : null}
 
+							{/* Payment section */}
+							<div className='rounded-lg border border-slate-800 bg-slate-900/50 p-4'>
+								<Elements options={elementsOptions} stripe={stripePromise}>
+									<PaymentForm
+										ref={paymentFormRef}
+										savedCards={savedCards}
+										stripeReady={Boolean(stripePromise)}
+									/>
+								</Elements>
+							</div>
+
 							{hasSubmitted && bookingValidationErrors.length > 0 ? (
 								<Alert variant='destructive'>
 									<div className='font-medium'>Check booking details</div>
@@ -334,9 +157,7 @@ export function BookingPage() {
 							<Button
 								className='w-full'
 								disabled={
-									bookingMutation.isPending ||
-									conflictsQuery.isFetching ||
-									quoteQuery.isFetching ||
+									isPending ||
 									!selectedFacility ||
 									!quoteQuery.data ||
 									!isTimeRangeValid ||
@@ -345,7 +166,7 @@ export function BookingPage() {
 								size='lg'
 								type='submit'
 							>
-								{bookingMutation.isPending ? 'Creating booking...' : 'Book now'}
+								{isPending ? 'Creating booking...' : 'Book now'}
 							</Button>
 						</form>
 					)}

@@ -49,8 +49,8 @@ public class GlobalExceptionHandler {
         ApiError error = ApiError.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.UNAUTHORIZED.value())
-                .error("Unauthorized")
-                .message(ex.getMessage())
+                .error("BadCredentials")
+                .message(ex.getMessage() != null ? ex.getMessage() : "Invalid username or password")
                 .details(List.of())
                 .build();
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);

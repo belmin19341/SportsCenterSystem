@@ -54,7 +54,6 @@ wait_for_health() {
 
 require_command curl
 require_command pnpm
-require_command lsof
 
 [ -f "frontend/package.json" ] || {
     echo "❌ frontend/package.json nije pronađen."
@@ -62,7 +61,14 @@ require_command lsof
 }
 
 if [ "$FORCE_RESTART" = true ]; then
-    frontend_pids=$(lsof -ti tcp:"$FRONTEND_PORT" -sTCP:LISTEN 2>/dev/null | sort -u | tr '\n' ' ')
+    frontend_pids=""
+    if command -v lsof >/dev/null 2>&1; then
+        frontend_pids=$(lsof -ti tcp:"$FRONTEND_PORT" -sTCP:LISTEN 2>/dev/null | sort -u | tr '\n' ' ')
+    elif [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+        # Windows fallback using netstat
+        frontend_pids=$(netstat -ano | grep ":$FRONTEND_PORT" | grep "LISTENING" | awk '{print $5}' | sort -u | tr '\n' ' ')
+    fi
+
     if [ -n "$frontend_pids" ]; then
         echo "🛑 Zaustavljam frontend na portu $FRONTEND_PORT..."
         for pid in $frontend_pids; do

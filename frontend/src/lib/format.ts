@@ -8,7 +8,7 @@ export function formatCurrency(value: number | string | null | undefined) {
 		return '—'
 	}
 
-	return new Intl.NumberFormat('bs-BA', {
+	return new Intl.NumberFormat('en-US', {
 		currency: 'BAM',
 		maximumFractionDigits: 2,
 		style: 'currency'
@@ -25,7 +25,7 @@ export function formatDateTime(value: string | null | undefined) {
 		return value
 	}
 
-	return new Intl.DateTimeFormat('bs-BA', {
+	return new Intl.DateTimeFormat('en-US', {
 		dateStyle: 'medium',
 		timeStyle: 'short'
 	}).format(date)
@@ -41,7 +41,7 @@ export function formatDate(value: string | null | undefined) {
 		return value
 	}
 
-	return new Intl.DateTimeFormat('bs-BA', {
+	return new Intl.DateTimeFormat('en-US', {
 		dateStyle: 'medium'
 	}).format(date)
 }
@@ -58,6 +58,14 @@ export function getErrorMessages(error: unknown) {
 		}
 
 		if ('status' in error && error.status === 401) {
+			// Distinguish between invalid credentials and expired session
+			const label = 'label' in error ? error.label : undefined
+			const message = error.message
+			
+			if (label === 'BadCredentials' || message?.includes('username') || message?.includes('password')) {
+				return ['Invalid username or password. Please check your credentials.']
+			}
+			
 			return ['Your session is no longer valid. Sign in again to continue.']
 		}
 
@@ -67,6 +75,18 @@ export function getErrorMessages(error: unknown) {
 
 		if ('status' in error && error.status === 429) {
 			return ['Too many attempts. Wait a moment and try again.']
+		}
+
+		if ('status' in error && error.status === 404) {
+			const message = error.message
+			if (message?.includes('Loyalty record not found')) {
+				return ['You do not currently belong to any loyalty category.']
+			}
+			return ['Resource not found.']
+		}
+
+		if ('status' in error && error.status === 503) {
+			return ['A required service is currently unavailable. Please try again in a few moments.']
 		}
 
 		return [error.message]

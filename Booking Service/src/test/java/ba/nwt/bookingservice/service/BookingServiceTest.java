@@ -3,6 +3,7 @@ package ba.nwt.bookingservice.service;
 import ba.nwt.bookingservice.client.PaymentServiceClient;
 import ba.nwt.bookingservice.client.ResourceServiceClient;
 import ba.nwt.bookingservice.client.UserServiceClient;
+import ba.nwt.bookingservice.client.dto.FacilityView;
 import ba.nwt.bookingservice.dto.BookingRequestDTO;
 import ba.nwt.bookingservice.dto.BookingResponseDTO;
 import ba.nwt.bookingservice.exception.ResourceNotFoundException;
@@ -23,6 +24,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -52,6 +54,10 @@ class BookingServiceTest {
 
     @BeforeEach
     void setUp() {
+        // Return a facility with no working-hours constraints so validation is bypassed
+        lenient().when(resourceServiceClient.getFacility(anyLong()))
+                .thenReturn(new FacilityView());
+
         booking = Booking.builder()
                 .id(1L)
                 .userId(3L)

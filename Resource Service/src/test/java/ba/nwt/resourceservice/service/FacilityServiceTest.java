@@ -41,7 +41,7 @@ class FacilityServiceTest {
     @BeforeEach
     void setUp() {
         facility = Facility.builder()
-                .id(1L).ownerId(2L).name("Mali teren A")
+                .id(1L).ownerId(2L).name("Small Field A")
                 .type(Facility.FacilityType.FOOTBALL_5V5).capacity(10)
                 .basePricePerHour(new BigDecimal("60.00"))
                 .workingHoursStart(LocalTime.of(8, 0))
@@ -49,7 +49,7 @@ class FacilityServiceTest {
                 .status(Facility.FacilityStatus.ACTIVE).build();
 
         responseDTO = FacilityResponseDTO.builder()
-                .id(1L).ownerId(2L).name("Mali teren A")
+                .id(1L).ownerId(2L).name("Small Field A")
                 .type(Facility.FacilityType.FOOTBALL_5V5)
                 .basePricePerHour(new BigDecimal("60.00"))
                 .status(Facility.FacilityStatus.ACTIVE).build();
@@ -63,7 +63,7 @@ class FacilityServiceTest {
         List<FacilityResponseDTO> result = facilityService.getAll();
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).getName()).isEqualTo("Mali teren A");
+        assertThat(result.get(0).getName()).isEqualTo("Small Field A");
     }
 
     @Test
@@ -73,7 +73,7 @@ class FacilityServiceTest {
 
         FacilityResponseDTO result = facilityService.getById(1L);
 
-        assertThat(result.getName()).isEqualTo("Mali teren A");
+        assertThat(result.getName()).isEqualTo("Small Field A");
     }
 
     @Test
@@ -87,7 +87,7 @@ class FacilityServiceTest {
     @Test
     void create_shouldCreateFacility() {
         FacilityRequestDTO request = FacilityRequestDTO.builder()
-                .ownerId(2L).name("Novi teren")
+                .ownerId(2L).name("New Court")
                 .type(Facility.FacilityType.PADEL).capacity(4)
                 .basePricePerHour(new BigDecimal("40.00"))
                 .workingHoursStart(LocalTime.of(7, 0))
@@ -105,7 +105,7 @@ class FacilityServiceTest {
     @Test
     void create_shouldThrowWhenInvalidHours() {
         FacilityRequestDTO request = FacilityRequestDTO.builder()
-                .ownerId(2L).name("Novi teren")
+                .ownerId(2L).name("New Court")
                 .type(Facility.FacilityType.PADEL)
                 .basePricePerHour(new BigDecimal("40.00"))
                 .workingHoursStart(LocalTime.of(22, 0))

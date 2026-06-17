@@ -13,8 +13,8 @@ for arg in "$@"; do
             SKIP_TESTS=false
             ;;
         *)
-            echo "❌ Nepoznata opcija: $arg"
-            echo "   Upotreba: bash build-all.sh [--skip-frontend] [--with-tests]"
+            echo "❌ Unknown option: $arg"
+            echo "   Usage: bash build-all.sh [--skip-frontend] [--with-tests]"
             exit 1
             ;;
     esac
@@ -22,7 +22,7 @@ done
 
 if [ -f .env ]; then
     export $(grep -v '^#' .env | xargs)
-    echo "✓ .env učitan"
+    echo "✓ .env loaded"
 fi
 
 require_command() {
@@ -49,6 +49,26 @@ build_maven_module() {
 }
 
 require_command java
+
+# ── JWT key auto-generation ──────────────────────────────────────────────────
+PRIVATE_KEY="User Service/src/main/resources/keys/jwt-private.pem"
+if [ ! -f "$PRIVATE_KEY" ]; then
+    echo ""
+    echo "🔑 JWT keys not found — generating RSA keypair..."
+    if ! command -v openssl >/dev/null 2>&1; then
+        echo "❌ openssl is required to generate JWT keys but was not found."
+        echo "   Install openssl and re-run, or manually place PEM files at:"
+        echo "     User Service/src/main/resources/keys/jwt-private.pem"
+        echo "     User Service/src/main/resources/keys/jwt-public.pem"
+        echo "     API Gateway/src/main/resources/keys/jwt-public.pem"
+        exit 1
+    fi
+    bash scripts/gen-jwt-keys.sh
+    echo "✓ JWT keys generated"
+else
+    echo "✓ JWT keys present"
+fi
+# ─────────────────────────────────────────────────────────────────────────────
 
 build_maven_module "config-server" "Config Server"
 build_maven_module "discovery-server" "Discovery Server"

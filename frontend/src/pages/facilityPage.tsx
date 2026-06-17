@@ -1,8 +1,5 @@
-import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {type FormEvent, useMemo, useState} from 'react'
-import {Link, useParams} from 'react-router'
-import {useAuth} from '@/auth/authContext'
-import {useFeedback} from '@/components/feedback'
+import {Link} from 'react-router'
+import {useFacilityData} from '@/hooks/useFacilityData'
 import {LoadingOrError} from '@/components/loadingOrError'
 import {Alert} from '@/components/ui/alert'
 import {Badge} from '@/components/ui/badge'
@@ -15,128 +12,32 @@ import {
 	CardTitle
 } from '@/components/ui/card'
 import {Label} from '@/components/ui/label'
-import {
-	createReview,
-	listReviewsForEntity,
-	listUserBookings
-} from '@/features/bookings/api'
+
+const COMMENT_MAX = 1000
 import {formatPriceAdjustment} from '@/features/bookings/pricingCopy'
-import {
-	getFacility,
-	listEquipmentByFacility,
-	listPricingRulesForFacility
-} from '@/features/resources/api'
-import {formatCurrency, formatDateTime, getErrorMessage} from '@/lib/format'
+import {formatCurrency, formatDateTime} from '@/lib/format'
 import {formatTimeRange} from '@/lib/localDateTime'
-import {validateReviewForm} from '@/lib/validation'
 
 function humanizeLabel(value: string) {
 	return value.replaceAll('_', ' ').toLowerCase()
 }
 
 export function FacilityPage() {
-	const {facilityId} = useParams()
-	const numericFacilityId = Number(facilityId)
-	const {session} = useAuth()
-	const {showFeedback} = useFeedback()
-	const queryClient = useQueryClient()
-	const [formError, setFormError] = useState<string | null>(null)
-	const [reviewForm, setReviewForm] = useState({comment: '', rating: 5})
-
-	const facilityQuery = useQuery({
-		enabled: Number.isFinite(numericFacilityId),
-		queryFn: () => getFacility(numericFacilityId),
-		queryKey: ['facility', numericFacilityId]
-	})
-	const equipmentQuery = useQuery({
-		enabled: Number.isFinite(numericFacilityId),
-		queryFn: () => listEquipmentByFacility(numericFacilityId),
-		queryKey: ['equipment', 'facility', numericFacilityId]
-	})
-	const pricingRulesQuery = useQuery({
-		enabled: Number.isFinite(numericFacilityId),
-		queryFn: () => listPricingRulesForFacility(numericFacilityId),
-		queryKey: ['pricing-rules', numericFacilityId]
-	})
-	const reviewsQuery = useQuery({
-		enabled: Boolean(session) && Number.isFinite(numericFacilityId),
-		queryFn: () => listReviewsForEntity('FACILITY', numericFacilityId),
-		queryKey: ['reviews', 'FACILITY', numericFacilityId]
-	})
-	const bookingsQuery = useQuery({
-		enabled: Boolean(session),
-		queryFn: () => listUserBookings(session?.userId ?? 0),
-		queryKey: ['bookings', session?.userId]
-	})
-
-	const canReview = useMemo(
-		() =>
-			Boolean(
-				session &&
-					bookingsQuery.data?.some(
-						booking =>
-							booking.facilityId === numericFacilityId &&
-							booking.status === 'COMPLETED'
-					)
-			),
-		[bookingsQuery.data, numericFacilityId, session]
-	)
-
-	const averageRating = useMemo(() => {
-		const reviews = reviewsQuery.data || []
-		if (reviews.length === 0) {
-			return null
-		}
-
-		return (
-			reviews.reduce((total, review) => total + review.rating, 0) /
-			reviews.length
-		)
-	}, [reviewsQuery.data])
-
-	const reviewMutation = useMutation({
-		mutationFn: () => {
-			if (!session) {
-				throw new Error('Sign in before submitting a review.')
-			}
-
-			return createReview({
-				comment: reviewForm.comment.trim() || null,
-				rating: reviewForm.rating,
-				reviewedEntityId: numericFacilityId,
-				reviewedEntityType: 'FACILITY',
-				reviewerId: session.userId
-			})
-		},
-		onSuccess() {
-			setReviewForm({comment: '', rating: 5})
-			showFeedback({
-				description: 'Your review was saved.',
-				title: 'Review submitted',
-				variant: 'success'
-			})
-			return queryClient.invalidateQueries({
-				queryKey: ['reviews', 'FACILITY', numericFacilityId]
-			})
-		}
-	})
-
-	async function handleReviewSubmit(event: FormEvent<HTMLFormElement>) {
-		event.preventDefault()
-		setFormError(null)
-
-		const validationErrors = validateReviewForm(reviewForm)
-		if (validationErrors.length > 0) {
-			setFormError(validationErrors.join(' '))
-			return
-		}
-
-		try {
-			await reviewMutation.mutateAsync()
-		} catch (error) {
-			setFormError(getErrorMessage(error))
-		}
-	}
+	const {
+		numericFacilityId,
+		session,
+		facilityQuery,
+		equipmentQuery,
+		pricingRulesQuery,
+		reviewsQuery,
+		canReview,
+		averageRating,
+		reviewForm,
+		setReviewForm,
+		formError,
+		reviewMutation,
+		handleReviewSubmit
+	} = useFacilityData();
 
 	if (!Number.isFinite(numericFacilityId)) {
 		return <LoadingOrError error={new Error('Facility ID is not valid.')} />
@@ -340,7 +241,14 @@ export function FacilityPage() {
 										</select>
 									</div>
 									<div className='space-y-2'>
-										<Label htmlFor='reviewComment'>Comment</Label>
+										<div className='flex items-center justify-between'>
+											<Label htmlFor='reviewComment'>Comment</Label>
+											<span
+												className={`text-xs ${reviewForm.comment.length > COMMENT_MAX ? 'text-rose-400' : 'text-slate-500'}`}
+											>
+												{reviewForm.comment.length}/{COMMENT_MAX}
+											</span>
+										</div>
 										<textarea
 											className='min-h-28 w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400'
 											id='reviewComment'
@@ -358,7 +266,10 @@ export function FacilityPage() {
 									) : null}
 									<Button
 										className='w-full sm:w-auto'
-										disabled={reviewMutation.isPending}
+										disabled={
+											reviewMutation.isPending ||
+											reviewForm.comment.length > COMMENT_MAX
+										}
 										type='submit'
 									>
 										{reviewMutation.isPending ? 'Saving...' : 'Submit review'}

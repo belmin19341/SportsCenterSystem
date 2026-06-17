@@ -15,4 +15,11 @@ public class PaymentCreateView {
     private BigDecimal depositAmount;
     private String paymentMethod;
     private String status;
+
+    // Stripe / saved-card fields forwarded from the frontend
+    private String stripeToken;
+    private Long savedCardId;
+    private Boolean saveCard;
+    private String cardLast4;
+    private String cardBrand;
 }

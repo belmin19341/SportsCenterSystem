@@ -2,6 +2,7 @@ package ba.nwt.bookingservice.controller;
 
 import ba.nwt.bookingservice.dto.BookingRequestDTO;
 import ba.nwt.bookingservice.dto.BookingResponseDTO;
+import ba.nwt.bookingservice.dto.GroupBookingRequestDTO;
 import ba.nwt.bookingservice.exception.GlobalExceptionHandler;
 import ba.nwt.bookingservice.exception.ResourceNotFoundException;
 import ba.nwt.bookingservice.model.Booking;
@@ -153,8 +154,7 @@ class BookingControllerZ4Test {
                 .totalPrice(new BigDecimal("100.00"))
                 .build();
         when(bookingService.createGroup(any(), any())).thenReturn(sampleResponse());
-        BookingController.GroupBookingRequest req =
-                new BookingController.GroupBookingRequest(base, List.of(1L, 2L, 3L));
+        GroupBookingRequestDTO req = new GroupBookingRequestDTO(base, List.of(1L, 2L, 3L));
         mockMvc.perform(post("/api/bookings/group")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
@@ -170,8 +170,7 @@ class BookingControllerZ4Test {
                 .endTime(LocalDateTime.now().plusDays(1).plusHours(1))
                 .totalPrice(new BigDecimal("100.00"))
                 .build();
-        BookingController.GroupBookingRequest req =
-                new BookingController.GroupBookingRequest(base, List.of());
+        GroupBookingRequestDTO req = new GroupBookingRequestDTO(base, List.of());
         mockMvc.perform(post("/api/bookings/group")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))

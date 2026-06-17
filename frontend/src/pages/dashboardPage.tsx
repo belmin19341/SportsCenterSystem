@@ -1,37 +1,10 @@
-import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {useMemo, useState} from 'react'
-import {useAuth} from '@/auth/authContext'
-import {useFeedback} from '@/components/feedback'
 import {LoadingOrError} from '@/components/loadingOrError'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle
-} from '@/components/ui/card'
-import {
-	listPaymentsForBookings,
-	listUserBookings,
-	listUserRentals
-} from '@/features/bookings/api'
-import {listFacilities} from '@/features/resources/api'
-import {
-	getUser,
-	getUserLoyalty,
-	listUserAchievements,
-	listUserNotifications,
-	markNotificationAsRead
-} from '@/features/user/api'
-import {
-	formatCurrency,
-	formatDate,
-	formatDateTime,
-	getErrorMessage
-} from '@/lib/format'
+import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
+import {formatCurrency, formatDate, formatDateTime} from '@/lib/format'
 import type {BookingStatus} from '@/types/api'
+import {useDashboardData} from '@/hooks/useDashboardData'
 
 function getFacilityName(
 	facilityNameById: Map<number, string>,
@@ -41,118 +14,21 @@ function getFacilityName(
 }
 
 export function DashboardPage() {
-	const {session} = useAuth()
-	const {showFeedback} = useFeedback()
-	const queryClient = useQueryClient()
-	const userId = session?.userId ?? 0
-	const [bookingFilter, setBookingFilter] = useState<BookingStatus | 'ALL'>(
-		'ALL'
-	)
-	const [notificationFilter, setNotificationFilter] = useState<
-		'ALL' | 'READ' | 'UNREAD'
-	>('ALL')
-
-	const facilitiesQuery = useQuery({
-		queryFn: () => listFacilities(),
-		queryKey: ['facilities']
-	})
-	const userQuery = useQuery({
-		enabled: Boolean(session),
-		queryFn: () => getUser(userId),
-		queryKey: ['user', userId]
-	})
-	const loyaltyQuery = useQuery({
-		enabled: Boolean(session),
-		queryFn: () => getUserLoyalty(userId),
-		queryKey: ['loyalty', userId]
-	})
-	const achievementsQuery = useQuery({
-		enabled: Boolean(session),
-		queryFn: () => listUserAchievements(userId),
-		queryKey: ['achievements', userId]
-	})
-	const bookingsQuery = useQuery({
-		enabled: Boolean(session),
-		queryFn: () => listUserBookings(userId),
-		queryKey: ['bookings', userId]
-	})
-	const rentalsQuery = useQuery({
-		enabled: Boolean(session),
-		queryFn: () => listUserRentals(userId),
-		queryKey: ['rentals', userId]
-	})
-	const notificationsQuery = useQuery({
-		enabled: Boolean(session),
-		queryFn: () => listUserNotifications(userId),
-		queryKey: ['notifications', userId]
-	})
-	const paymentsQuery = useQuery({
-		enabled: Boolean(session) && (bookingsQuery.data?.length ?? 0) > 0,
-		queryFn: () =>
-			listPaymentsForBookings(
-				(bookingsQuery.data || []).map(booking => booking.id)
-			),
-		queryKey: [
-			'payments',
-			userId,
-			(bookingsQuery.data || []).map(booking => booking.id).join(',')
-		]
-	})
-
-	const markReadMutation = useMutation({
-		mutationFn: (notificationId: number) =>
-			markNotificationAsRead(notificationId),
-		onError(error) {
-			showFeedback({
-				description: getErrorMessage(error),
-				title: 'Notification update failed',
-				variant: 'destructive'
-			})
-		},
-		onSuccess() {
-			showFeedback({
-				description: 'The notification was marked as read.',
-				title: 'Notification updated',
-				variant: 'success'
-			})
-			return queryClient.invalidateQueries({
-				queryKey: ['notifications', userId]
-			})
-		}
-	})
-
-	const facilityNameById = useMemo(
-		() =>
-			new Map(
-				(facilitiesQuery.data || []).map(facility => [
-					facility.id,
-					facility.name
-				])
-			),
-		[facilitiesQuery.data]
-	)
-	const visibleBookings = useMemo(
-		() =>
-			(bookingsQuery.data || []).filter(
-				booking => bookingFilter === 'ALL' || booking.status === bookingFilter
-			),
-		[bookingFilter, bookingsQuery.data]
-	)
-	const visibleNotifications = useMemo(
-		() =>
-			(notificationsQuery.data || []).filter(notification => {
-				if (notificationFilter === 'READ') {
-					return notification.isRead
-				}
-
-				if (notificationFilter === 'UNREAD') {
-					return !notification.isRead
-				}
-
-				return true
-			}),
-		[notificationFilter, notificationsQuery.data]
-	)
+	const {
+		session,
+		userQuery,
+		loyaltyQuery,
+		achievementsQuery,
+		bookingsQuery,
+		rentalsQuery,
+		notificationsQuery,
+		paymentsQuery,
+		savedCardsQuery,
+		deleteCardMutation,
+		markReadMutation,
+		filters,
+		derived
+	} = useDashboardData()
 
 	if (!session) {
 		return null
@@ -234,6 +110,51 @@ export function DashboardPage() {
 				</Card>
 			</section>
 
+			<section>
+				<Card>
+					<CardHeader>
+						<CardTitle>Saved Cards</CardTitle>
+						<CardDescription>Cards saved for future payments.</CardDescription>
+					</CardHeader>
+					<CardContent>
+						{savedCardsQuery.isPending ? (
+							<LoadingOrError title='Loading saved cards' />
+						) : savedCardsQuery.isError ? (
+							<LoadingOrError error={savedCardsQuery.error} />
+						) : !savedCardsQuery.data || savedCardsQuery.data.length === 0 ? (
+							<div className='text-sm text-slate-400'>No saved cards.</div>
+						) : (
+							<div className='space-y-3'>
+								{savedCardsQuery.data.map((card: any) => (
+									<div
+										className='flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/50 p-4'
+										key={card.id}
+									>
+										<div className='text-sm text-slate-300'>
+											<span className='font-medium text-white'>
+												{card.brand.toUpperCase()}
+											</span>{' '}
+											•••• {card.last4}
+											<div className='mt-0.5 text-xs text-slate-500'>
+												Added {formatDate(card.createdAt)}
+											</div>
+										</div>
+										<Button
+											disabled={deleteCardMutation.isPending}
+											onClick={() => deleteCardMutation.mutate(card.id)}
+											size='sm'
+											variant='outline'
+										>
+											Remove
+										</Button>
+									</div>
+								))}
+							</div>
+						)}
+					</CardContent>
+				</Card>
+			</section>
+
 			<section className='grid gap-6 xl:grid-cols-[1.3fr,0.7fr]'>
 				<Card>
 					<CardHeader>
@@ -245,10 +166,10 @@ export function DashboardPage() {
 							<select
 								aria-label='Filter bookings by status'
 								className='h-10 w-full rounded-md border border-slate-800 bg-slate-950 px-3 text-sm text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 sm:w-auto'
-								onChange={event =>
-									setBookingFilter(event.target.value as BookingStatus | 'ALL')
+								onChange={event => 
+									filters.setBookingFilter(event.target.value as BookingStatus | 'ALL')
 								}
-								value={bookingFilter}
+								value={filters.bookingFilter}
 							>
 								<option value='ALL'>All statuses</option>
 								<option value='PENDING'>Pending</option>
@@ -263,13 +184,13 @@ export function DashboardPage() {
 							<LoadingOrError title='Loading bookings' />
 						) : bookingsQuery.isError ? (
 							<LoadingOrError error={bookingsQuery.error} />
-						) : visibleBookings.length === 0 ? (
+						) : derived.visibleBookings.length === 0 ? (
 							<div className='text-sm text-slate-400'>
 								No bookings match the selected filter.
 							</div>
 						) : (
 							<div className='space-y-4'>
-								{visibleBookings.map(booking => (
+								{derived.visibleBookings.map((booking: any) => (
 									<div
 										className='rounded-xl border border-slate-800 bg-slate-900/50 p-4'
 										key={booking.id}
@@ -278,7 +199,7 @@ export function DashboardPage() {
 											<div className='min-w-0'>
 												<div className='font-medium text-white'>
 													{getFacilityName(
-														facilityNameById,
+														derived.facilityNameById,
 														booking.facilityId
 													)}
 												</div>
@@ -311,13 +232,13 @@ export function DashboardPage() {
 							<LoadingOrError title='Loading achievements' />
 						) : achievementsQuery.isError ? (
 							<LoadingOrError error={achievementsQuery.error} />
-						) : achievementsQuery.data.length === 0 ? (
+						) : !achievementsQuery.data || achievementsQuery.data.length === 0 ? (
 							<div className='text-sm text-slate-400'>
 								No achievements unlocked yet.
 							</div>
 						) : (
 							<div className='flex flex-wrap gap-2'>
-								{achievementsQuery.data.map(achievement => (
+								{(achievementsQuery.data || []).map((achievement: any) => (
 									<Badge key={achievement.id} variant='success'>
 										{achievement.achievementName}
 									</Badge>
@@ -339,13 +260,13 @@ export function DashboardPage() {
 							<LoadingOrError title='Loading rentals' />
 						) : rentalsQuery.isError ? (
 							<LoadingOrError error={rentalsQuery.error} />
-						) : rentalsQuery.data.length === 0 ? (
+						) : (rentalsQuery.data?.length ?? 0) === 0 ? (
 							<div className='text-sm text-slate-400'>
 								No equipment rentals found.
 							</div>
 						) : (
 							<div className='space-y-3'>
-								{rentalsQuery.data.map(rental => (
+								{(rentalsQuery.data || []).map((rental: any) => (
 									<div
 										className='rounded-xl border border-slate-800 bg-slate-900/50 p-4 text-sm text-slate-300'
 										key={rental.id}
@@ -390,7 +311,7 @@ export function DashboardPage() {
 							</div>
 						) : (
 							<div className='space-y-3'>
-								{paymentsQuery.data.map(payment => (
+								{(paymentsQuery.data || []).map((payment: any) => (
 									<div
 										className='rounded-xl border border-slate-800 bg-slate-900/50 p-4 text-sm text-slate-300'
 										key={payment.id}
@@ -422,12 +343,12 @@ export function DashboardPage() {
 							<select
 								aria-label='Filter notifications'
 								className='h-10 w-full rounded-md border border-slate-800 bg-slate-950 px-3 text-sm text-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 sm:w-auto'
-								onChange={event =>
-									setNotificationFilter(
+								onChange={event => 
+									filters.setNotificationFilter(
 										event.target.value as 'ALL' | 'READ' | 'UNREAD'
 									)
 								}
-								value={notificationFilter}
+								value={filters.notificationFilter}
 							>
 								<option value='ALL'>All</option>
 								<option value='UNREAD'>Unread</option>
@@ -440,13 +361,13 @@ export function DashboardPage() {
 							<LoadingOrError title='Loading notifications' />
 						) : notificationsQuery.isError ? (
 							<LoadingOrError error={notificationsQuery.error} />
-						) : visibleNotifications.length === 0 ? (
+						) : derived.visibleNotifications.length === 0 ? (
 							<div className='text-sm text-slate-400'>
 								No notifications match the selected filter.
 							</div>
 						) : (
 							<div className='space-y-3'>
-								{visibleNotifications.slice(0, 6).map(notification => (
+								{derived.visibleNotifications.slice(0, 6).map((notification: any) => (
 									<div
 										className='rounded-xl border border-slate-800 bg-slate-900/50 p-4'
 										key={notification.id}

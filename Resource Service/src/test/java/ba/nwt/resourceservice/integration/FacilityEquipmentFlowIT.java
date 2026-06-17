@@ -28,9 +28,9 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Flow: kreiranje terena sa opremom.
- * Testira vezu između terena i opreme, batch kreiranje,
- * promjenu statusa terena i pretragu opreme po tipu.
+ * Flow: facility creation with linked equipment.
+ * Tests the relationship between facilities and equipment, batch creation,
+ * facility status changes and equipment search by type.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
@@ -74,10 +74,10 @@ class FacilityEquipmentFlowIT {
     void createFacilityWithEquipment_equipmentLinkedToFacility() {
         FacilityResponseDTO facility = createFacility("Tennis Club", Facility.FacilityType.TENNIS);
 
-        EquipmentResponseDTO equipment = addEquipment(facility.getId(), "Wilson reket", Equipment.EquipmentType.RACKET);
+        EquipmentResponseDTO equipment = addEquipment(facility.getId(), "Wilson Racket", Equipment.EquipmentType.RACKET);
 
         assertThat(equipment.getFacilityId()).isEqualTo(facility.getId());
-        assertThat(equipment.getName()).isEqualTo("Wilson reket");
+        assertThat(equipment.getName()).isEqualTo("Wilson Racket");
 
         // Provjeri link kroz GET /api/equipment/facility/{id}
         ResponseEntity<List<EquipmentResponseDTO>> resp = restTemplate.exchange(
@@ -91,9 +91,9 @@ class FacilityEquipmentFlowIT {
     void addMultipleEquipmentItemsToFacility_allRetrievableByFacilityId() {
         FacilityResponseDTO facility = createFacility("Padel Arena", Facility.FacilityType.PADEL);
 
-        addEquipment(facility.getId(), "Bullpadel reket 1", Equipment.EquipmentType.RACKET);
-        addEquipment(facility.getId(), "Bullpadel reket 2", Equipment.EquipmentType.RACKET);
-        addEquipment(facility.getId(), "Padel lopta", Equipment.EquipmentType.BALL);
+        addEquipment(facility.getId(), "Bullpadel Racket 1", Equipment.EquipmentType.RACKET);
+        addEquipment(facility.getId(), "Bullpadel Racket 2", Equipment.EquipmentType.RACKET);
+        addEquipment(facility.getId(), "Padel Ball", Equipment.EquipmentType.BALL);
 
         ResponseEntity<List<EquipmentResponseDTO>> resp = restTemplate.exchange(
                 "/api/equipment/facility/" + facility.getId(), HttpMethod.GET, null,
@@ -106,16 +106,16 @@ class FacilityEquipmentFlowIT {
 
     @Test
     void batchEquipmentCreation_allItemsCreatedAtomically() {
-        FacilityResponseDTO facility = createFacility("Fitness Centar", Facility.FacilityType.TABLE_TENNIS);
+        FacilityResponseDTO facility = createFacility("Fitness Center", Facility.FacilityType.TABLE_TENNIS);
 
         List<EquipmentRequestDTO> batch = List.of(
-                EquipmentRequestDTO.builder().facilityId(facility.getId()).name("Bicikl 1")
+                EquipmentRequestDTO.builder().facilityId(facility.getId()).name("Bike 1")
                         .type(Equipment.EquipmentType.BICYCLE).quantityTotal(3).quantityAvailable(3)
                         .pricePerDay(new BigDecimal("15.00")).equipmentCondition(Equipment.EquipmentCondition.NEW).build(),
-                EquipmentRequestDTO.builder().facilityId(facility.getId()).name("Bicikl 2")
+                EquipmentRequestDTO.builder().facilityId(facility.getId()).name("Bike 2")
                         .type(Equipment.EquipmentType.BICYCLE).quantityTotal(2).quantityAvailable(2)
                         .pricePerDay(new BigDecimal("15.00")).equipmentCondition(Equipment.EquipmentCondition.GOOD).build(),
-                EquipmentRequestDTO.builder().facilityId(facility.getId()).name("Trenažer")
+                EquipmentRequestDTO.builder().facilityId(facility.getId()).name("Trainer")
                         .type(Equipment.EquipmentType.FITNESS).quantityTotal(1).quantityAvailable(1)
                         .pricePerDay(new BigDecimal("20.00")).equipmentCondition(Equipment.EquipmentCondition.NEW).build()
         );
@@ -133,7 +133,7 @@ class FacilityEquipmentFlowIT {
 
     @Test
     void updateFacilityStatusToMaintenance_shouldPersistAndBeReflectedInDatabase() {
-        FacilityResponseDTO facility = createFacility("Teren na renoviranju", Facility.FacilityType.FOOTBALL_5V5);
+        FacilityResponseDTO facility = createFacility("Court Under Renovation", Facility.FacilityType.FOOTBALL_5V5);
         assertThat(facility.getStatus()).isEqualTo(Facility.FacilityStatus.ACTIVE);
 
         FacilityRequestDTO updateReq = FacilityRequestDTO.builder()
@@ -156,9 +156,9 @@ class FacilityEquipmentFlowIT {
     void getEquipmentByType_shouldReturnOnlyMatchingType() {
         FacilityResponseDTO facility = createFacility("Multi Sport", Facility.FacilityType.TENNIS);
 
-        addEquipment(facility.getId(), "Reket A", Equipment.EquipmentType.RACKET);
-        addEquipment(facility.getId(), "Reket B", Equipment.EquipmentType.RACKET);
-        addEquipment(facility.getId(), "Lopta",   Equipment.EquipmentType.BALL);
+        addEquipment(facility.getId(), "Racket A", Equipment.EquipmentType.RACKET);
+        addEquipment(facility.getId(), "Racket B", Equipment.EquipmentType.RACKET);
+        addEquipment(facility.getId(), "Ball",     Equipment.EquipmentType.BALL);
 
         ResponseEntity<List<EquipmentResponseDTO>> resp = restTemplate.exchange(
                 "/api/equipment/type/RACKET", HttpMethod.GET, null,

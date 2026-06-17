@@ -39,9 +39,9 @@ class EquipmentServiceTest {
 
     @BeforeEach
     void setUp() {
-        facility = Facility.builder().id(1L).name("Mali teren A").build();
+        facility = Facility.builder().id(1L).name("Small Field A").build();
         equipment = Equipment.builder()
-                .id(1L).facility(facility).name("Fudbalska lopta")
+                .id(1L).facility(facility).name("Nike Football")
                 .type(Equipment.EquipmentType.BALL).quantityTotal(10).quantityAvailable(8)
                 .pricePerDay(new BigDecimal("5.00"))
                 .equipmentCondition(Equipment.EquipmentCondition.GOOD).build();
@@ -54,7 +54,7 @@ class EquipmentServiceTest {
         List<EquipmentResponseDTO> result = equipmentService.getAll();
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).getName()).isEqualTo("Fudbalska lopta");
+        assertThat(result.get(0).getName()).isEqualTo("Nike Football");
     }
 
     @Test
@@ -82,7 +82,7 @@ class EquipmentServiceTest {
     @Test
     void create_shouldCreateEquipment() {
         EquipmentRequestDTO request = EquipmentRequestDTO.builder()
-                .facilityId(1L).name("Fudbalska lopta").type(Equipment.EquipmentType.BALL)
+                .facilityId(1L).name("Nike Football").type(Equipment.EquipmentType.BALL)
                 .quantityTotal(10).quantityAvailable(8)
                 .pricePerDay(new BigDecimal("5.00")).build();
 

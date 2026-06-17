@@ -4,14 +4,13 @@ import ba.nwt.paymentservice.client.UserServiceClient;
 import ba.nwt.paymentservice.config.JsonPatchUtil;
 import ba.nwt.paymentservice.dto.PaymentRequestDTO;
 import ba.nwt.paymentservice.dto.PaymentResponseDTO;
+import ba.nwt.paymentservice.dto.RevenueReportDTO;
 import ba.nwt.paymentservice.exception.ResourceNotFoundException;
 import ba.nwt.paymentservice.model.Notification;
 import ba.nwt.paymentservice.model.Payment;
 import ba.nwt.paymentservice.repository.NotificationRepository;
 import ba.nwt.paymentservice.repository.PaymentRepository;
 import com.github.fge.jsonpatch.JsonPatch;
-import lombok.Builder;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
@@ -35,6 +34,8 @@ public class PaymentService {
     private final ModelMapper modelMapper;
     private final JsonPatchUtil jsonPatchUtil;
     private final UserServiceClient userServiceClient;
+    private final StripeGateway stripeGateway;
+    private final SavedCardService savedCardService;
 
     public List<PaymentResponseDTO> getAll() {
         return paymentRepository.findAll().stream()
@@ -85,14 +86,64 @@ public class PaymentService {
             userServiceClient.getUser(dto.getUserId());
         }
 
+        Payment.PaymentStatus status;
+        String transactionId;
+
+        Payment.PaymentMethod method = dto.getPaymentMethod();
+
+        if (method == Payment.PaymentMethod.CASH) {
+            transactionId = "CASH-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+            status = Payment.PaymentStatus.PAID;
+
+        } else if (method == Payment.PaymentMethod.PAYPAL || !stripeGateway.isEnabled()) {
+            // PAYPAL has no integration; also fallback when Stripe key not configured
+            transactionId = "TXN-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+            status = Payment.PaymentStatus.PAID;
+
+        } else if (dto.getSavedCardId() != null) {
+            // Use a previously saved card
+            try {
+                var card = savedCardService.getById(dto.getSavedCardId());
+                var result = stripeGateway.chargeCustomer(dto.getAmount(), card.getStripeCustomerId());
+                transactionId = result.chargeId();
+                status = Payment.PaymentStatus.PAID;
+            } catch (StripeGateway.StripeChargeException e) {
+                transactionId = "TXN-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+                status = Payment.PaymentStatus.FAILED;
+            }
+
+        } else if (dto.getStripeToken() != null) {
+            // New card provided by frontend via Stripe.js
+            try {
+                if (Boolean.TRUE.equals(dto.getSaveCard()) && dto.getUserId() != null) {
+                    var result = stripeGateway.createCustomerAndCharge(dto.getAmount(), dto.getStripeToken());
+                    transactionId = result.chargeId();
+                    status = Payment.PaymentStatus.PAID;
+                    savedCardService.save(dto.getUserId(), dto.getCardLast4(), dto.getCardBrand(), result.customerId());
+                } else {
+                    var result = stripeGateway.chargeWithToken(dto.getAmount(), dto.getStripeToken());
+                    transactionId = result.chargeId();
+                    status = Payment.PaymentStatus.PAID;
+                }
+            } catch (StripeGateway.StripeChargeException e) {
+                transactionId = "TXN-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+                status = Payment.PaymentStatus.FAILED;
+            }
+
+        } else {
+            // No token, no saved card — backward-compat auto-approve
+            transactionId = "TXN-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+            status = Payment.PaymentStatus.PAID;
+        }
+
         Payment payment = Payment.builder()
                 .bookingId(dto.getBookingId())
                 .rentalId(dto.getRentalId())
                 .amount(dto.getAmount())
                 .depositAmount(dto.getDepositAmount())
                 .paymentMethod(dto.getPaymentMethod())
-                .transactionId("TXN-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
-                .status(dto.getStatus() != null ? dto.getStatus() : Payment.PaymentStatus.PENDING)
+                .transactionId(transactionId)
+                .status(status)
                 .build();
 
         if (payment.getStatus() == Payment.PaymentStatus.PAID) {
@@ -176,20 +227,20 @@ public class PaymentService {
         return modelMapper.map(savedPayment, PaymentResponseDTO.class);
     }
 
-    public RevenueReport getRevenueBetween(LocalDateTime from, LocalDateTime to) {
+    public RevenueReportDTO getRevenueBetween(LocalDateTime from, LocalDateTime to) {
         if (!to.isAfter(from)) {
             throw new IllegalArgumentException("'to' must be after 'from'");
         }
         BigDecimal total = paymentRepository.sumRevenueBetween(from, to);
-        List<RevenueByMethod> byMethod = new ArrayList<>();
+        List<RevenueReportDTO.RevenueByMethodDTO> byMethod = new ArrayList<>();
         for (Object[] row : paymentRepository.revenueByMethodBetween(from, to)) {
-            byMethod.add(RevenueByMethod.builder()
+            byMethod.add(RevenueReportDTO.RevenueByMethodDTO.builder()
                     .method((Payment.PaymentMethod) row[0])
                     .total((BigDecimal) row[1])
                     .count(((Number) row[2]).longValue())
                     .build());
         }
-        return RevenueReport.builder()
+        return RevenueReportDTO.builder()
                 .from(from).to(to)
                 .totalRevenue(total == null ? BigDecimal.ZERO : total)
                 .byMethod(byMethod)
@@ -204,20 +255,6 @@ public class PaymentService {
         paymentRepository.deleteById(id);
     }
 
-    @Data @Builder
-    public static class RevenueReport {
-        private LocalDateTime from;
-        private LocalDateTime to;
-        private BigDecimal totalRevenue;
-        private List<RevenueByMethod> byMethod;
-    }
-
-    @Data @Builder
-    public static class RevenueByMethod {
-        private Payment.PaymentMethod method;
-        private BigDecimal total;
-        private long count;
-    }
 }
 
 

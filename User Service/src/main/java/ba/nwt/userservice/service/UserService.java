@@ -5,6 +5,8 @@ import ba.nwt.userservice.dto.UserRequestDTO;
 import ba.nwt.userservice.dto.UserResponseDTO;
 import ba.nwt.userservice.exception.ResourceNotFoundException;
 import ba.nwt.userservice.model.User;
+import ba.nwt.userservice.model.UserLoyalty;
+import ba.nwt.userservice.repository.UserLoyaltyRepository;
 import ba.nwt.userservice.repository.UserRepository;
 import com.github.fge.jsonpatch.JsonPatch;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,7 @@ import java.util.stream.Collectors;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final UserLoyaltyRepository userLoyaltyRepository;
     private final ModelMapper modelMapper;
     private final JsonPatchUtil jsonPatchUtil;
     private final PasswordEncoder passwordEncoder;
@@ -68,6 +71,15 @@ public class UserService {
                 .build();
 
         User saved = userRepository.save(user);
+
+        userLoyaltyRepository.save(
+            UserLoyalty.builder()
+                .user(saved)
+                .totalPoints(0)
+                .tier(UserLoyalty.LoyaltyTier.BRONZE)
+                .build()
+        );
+
         return modelMapper.map(saved, UserResponseDTO.class);
     }
 

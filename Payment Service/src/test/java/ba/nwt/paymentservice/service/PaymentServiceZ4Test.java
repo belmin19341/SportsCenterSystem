@@ -2,6 +2,7 @@ package ba.nwt.paymentservice.service;
 
 import ba.nwt.paymentservice.config.JsonPatchUtil;
 import ba.nwt.paymentservice.dto.PaymentResponseDTO;
+import ba.nwt.paymentservice.dto.RevenueReportDTO;
 import ba.nwt.paymentservice.model.Notification;
 import ba.nwt.paymentservice.model.Payment;
 import ba.nwt.paymentservice.repository.NotificationRepository;
@@ -98,7 +99,7 @@ class PaymentServiceZ4Test {
                         new Object[]{Payment.PaymentMethod.CREDIT_CARD, new BigDecimal("200.00"), 4L},
                         new Object[]{Payment.PaymentMethod.PAYPAL, new BigDecimal("50.00"), 1L}));
 
-        PaymentService.RevenueReport report = paymentService.getRevenueBetween(from, to);
+        RevenueReportDTO report = paymentService.getRevenueBetween(from, to);
 
         assertThat(report.getTotalRevenue()).isEqualByComparingTo("250.00");
         assertThat(report.getByMethod()).hasSize(2);

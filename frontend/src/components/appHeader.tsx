@@ -106,15 +106,7 @@ export function AppHeader() {
 									</NavLink>
 								) : null}
 							</>
-						) : (
-							<NavLink
-								className={navLinkClassName}
-								onClick={closeMenu}
-								to='/login'
-							>
-								Sign in
-							</NavLink>
-						)}
+						) : null}
 					</nav>
 
 					<div className='mt-3 grid min-w-0 gap-2 lg:mt-0 lg:flex lg:items-center lg:justify-end lg:gap-3'>
@@ -142,13 +134,24 @@ export function AppHeader() {
 								</div>
 							</>
 						) : (
-							<Link
-								className='w-full lg:w-auto'
-								onClick={closeMenu}
-								to='/login'
-							>
-								<Button className='w-full lg:w-auto'>Open app</Button>
-							</Link>
+							<div className='flex flex-col gap-2 lg:flex-row lg:items-center'>
+								<Link
+									className='w-full lg:w-auto'
+									onClick={closeMenu}
+									to='/login'
+								>
+									<Button className='w-full lg:w-auto' variant='ghost'>
+										Sign in
+									</Button>
+								</Link>
+								<Link
+									className='w-full lg:w-auto'
+									onClick={closeMenu}
+									to='/register'
+								>
+									<Button className='w-full lg:w-auto'>Register</Button>
+								</Link>
+							</div>
 						)}
 					</div>
 				</div>
